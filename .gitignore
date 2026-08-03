@@ -1,0 +1,8 @@
+# Build artifacts
+.build/
+build/
+
+# Local config / local data
+*.db
+*.db-shm
+*.db-wal

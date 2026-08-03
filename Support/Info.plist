@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>Mist</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.mist.windowmanager</string>
+    <key>CFBundleName</key>
+    <string>Mist</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+
+    <!-- A menu-bar app: no Dock icon, no Cmd-Tab entry. -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <!-- Description shown to the user in System Settings when requesting
+         Accessibility. Keep in sync with the strings the coordinator exposes. -->
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Mist needs accessibility permission to move, resize, and focus your windows.</string>
+
+    <key>NSHumanReadableCopyright</key>
+    <string>Mist is open source. See the LICENSE.</string>
+</dict>
+</plist>

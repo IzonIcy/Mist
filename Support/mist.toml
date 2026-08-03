@@ -1,0 +1,60 @@
+# Mist configuration.
+#
+# Mist is a tiling window manager for macOS. Config is TOML. It hot-reloads: edit
+# this file and Mist picks up the changes without a restart.
+#
+# The default location is ~/Library/Application Support/Mist/mist.toml
+
+# -----------------------------------------------------------------------------
+[general]
+# gap: spacing (points) between adjacent windows.
+gap = 8
+
+# Gap between the tiled grid and the edge of the screen.
+outer_gap = 16
+
+# Default layout for a new workspace.
+# One of: bsp | horizontal | vertical | stack | monocle | floating
+layout = "bsp"
+
+# Master switch for animations.
+animate = true
+
+# Animation curve family: spring | ease | instant
+animation = "spring"
+
+# -----------------------------------------------------------------------------
+# [hotkeys]
+# -----------------------------------------------------------------------------
+# Format: "<modifier>+<modifier>+....+<key>"
+# Modifiers: cmd, alt, ctrl, shift.  Keys use macOS names (h, l, 8, space, ...).
+[hotkeys]
+focus_left  = "cmd+alt+h"
+focus_right = "cmd+alt+l"
+focus_up    = "cmd+alt+k"
+focus_down  = "cmd+alt+j"
+toggle_float = "cmd+alt+f"
+
+# -----------------------------------------------------------------------------
+# [[rules]]
+# -----------------------------------------------------------------------------
+# Rules match windows and apply actions. Conditions within one rule are AND-ed.
+# Actions: float, always_on_top, monitor, workspace, layout.
+# Examples:
+
+# Keep Safari floating.
+[[rules]]
+name = "Float Safari"
+window_app = "Safari"
+float = true
+
+# Pin Picture-in-Picture windows on top of everything.
+[[rules]]
+window_app = "Safari"
+window_title_contains = "Picture-in-Picture"
+always_on_top = true
+
+# Send a specific app to the second monitor.
+[[rules]]
+window_bundle_id = "com.mitchellh.ghostty"
+monitor = 2
