@@ -124,6 +124,7 @@ public struct TOMLParser {
     }
 
     private mutating func expectLineEnd() throws {
+        skipInlineSpace()
         if let c = current, c == "#" { skipComment() }
         guard current == nil || current == "\n" else {
             throw fail("expected end of line")
