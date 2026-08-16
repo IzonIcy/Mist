@@ -6,3 +6,8 @@ build/
 *.db
 *.db-shm
 *.db-wal
+
+# Agent instruction files
+AGENTS.md
+CLAUDE.md
+.github/copilot-instructions.md
