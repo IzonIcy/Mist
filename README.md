@@ -1,5 +1,7 @@
 # Mist
 
+[![CI](https://github.com/IzonIcy/Mist/actions/workflows/ci.yml/badge.svg)](https://github.com/IzonIcy/Mist/actions/workflows/ci.yml)
+
 A tiling window manager for macOS, built from the ground up as a modern, open,
 well-typed alternative to yabai / aerospace.
 
