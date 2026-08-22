@@ -117,4 +117,34 @@ struct TOMLParserTests {
             Issue.record("unexpected error \(error)")
         }
     }
+
+    // MARK: regressions
+
+    @Test func deeplyNestedArraysThrowInsteadOfStackOverflow() {
+        // 10_000 nested arrays previously recursed unbounded (stack overflow);
+        // now it must be a positioned error well before that.
+        let source = "a = " + String(repeating: "[", count: 10_000) + String(repeating: "]", count: 10_000)
+        #expect(throws: MistError.self) {
+            _ = try parse(source)
+        }
+    }
+
+    @Test func duplicateTableHeaderThrows() {
+        // TOML 1.0: redefining [table] is an error — silently discarding the
+        // earlier keys used to make users lose config invisibly.
+        #expect(throws: MistError.self) {
+            _ = try parse("[general]\nmode = \"x\"\n[general]\nother = 1")
+        }
+    }
+
+    @Test func parsesCRLFLineEndings() throws {
+        let doc = try parse("gap = 8\r\n# comment\r\nname = \"m\"\r\n")
+        #expect(doc.root.integer(forKey: "gap") == 8)
+        #expect(doc.root.string(forKey: "name") == "m")
+    }
+
+    @Test func parsesBOMPrefixedSource() throws {
+        let doc = try parse("\u{feff}gap = 4\n")
+        #expect(doc.root.integer(forKey: "gap") == 4)
+    }
 }

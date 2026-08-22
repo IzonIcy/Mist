@@ -10,11 +10,11 @@ import MistCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: AppCoordinator?
     private var mouseMonitor: Any?
+    /// NSStatusItem must be strongly retained by its owner or the menu bar
+    /// item disappears once setupMenuBar() returns.
+    private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let buffer = NSApplication.shared
-        _ = buffer
-
         // Build the Core stack and start it.
         let core = AppCoordinator(
             eventBus: EventBus(),
@@ -47,21 +47,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// AppKit's global mouse location is bottom-left origin; the window frames
     /// from AX are top-left origin (CG coordinates). Convert before lookup.
+    /// Both spaces anchor to the *primary* screen, so its height is the right
+    /// pivot — using the tallest screen breaks vertically-stacked displays.
     private static func cgPoint(from appKitPoint: NSPoint) -> CGPoint {
-        let screenHeight = NSScreen.screens.map(\.frame.maxY).max() ?? 0
-        return CGPoint(x: appKitPoint.x, y: screenHeight - appKitPoint.y)
+        let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
+        return CGPoint(x: appKitPoint.x, y: primaryHeight - appKitPoint.y)
     }
 
     /// Minimal menu bar presence so the app is discoverable / un-quittable on
     /// accident. Settings UI (SwiftUI) attaches later.
     @MainActor
     private func setupMenuBar() {
-        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        if let button = statusItem.button {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let button = item.button {
             button.image = NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: "Mist")
         }
         let menu = NSMenu()
         menu.addItem(withTitle: "Quit Mist", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        statusItem.menu = menu
+        item.menu = menu
+        statusItem = item
     }
 }

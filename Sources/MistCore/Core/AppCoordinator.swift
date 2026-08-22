@@ -27,6 +27,7 @@ public final class AppCoordinator {
     private let displayFrames: any DisplayFrameProviding
 
     private var currentConfig = MistConfig()
+    private var hasAppliedConfig = false
     private var permissionGranted = false
     private var subscriptions: Set<AnyCancellable> = []
     private var lastMouseFocusAt: ContinuousClock.Instant?
@@ -76,15 +77,20 @@ public final class AppCoordinator {
             }
             apply(config)
         } catch {
-            // Bad/missing config must never crash launch; fall back to defaults
-            // and log exactly what and where.
-            logger.error("Failed to load config, using defaults: \(String(describing: error))")
-            apply(.default)
+            // Bad/missing config must never crash launch — and a *failed
+            // reload* must never wipe the user's settings. First load falls
+            // back to defaults; afterwards we keep the last-good config.
+            logger.error("Failed to load config: \(String(describing: error))")
+            if !hasAppliedConfig {
+                logger.error("No previous config available, using defaults")
+                apply(.default)
+            }
         }
     }
 
     private func apply(_ config: MistConfig) {
         currentConfig = config
+        hasAppliedConfig = true
         let manager = HotkeyManager()
         do {
             try manager.setBindings(config.hotkeys)

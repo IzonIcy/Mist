@@ -22,11 +22,24 @@ public struct TOMLParser {
     private var chars: [Character]
     private var index = 0
     private var line = 1
+    private var arrayDepth = 0
+
+    /// Maximum nested-array depth. Hand-written recursive descent + hostile
+    /// input means unbounded recursion is a stack overflow waiting to happen;
+    /// this turns `a = [[[[[…` into a positioned error instead of a crash.
+    private static let maxArrayDepth = 16
 
     /// Creates a parser for `source`, labelled `sourceName` in errors.
+    ///
+    /// Normalizes UTF-8 BOM and CRLF/CR line endings up front so files saved
+    /// by Windows/cross-platform editors parse instead of failing with a
+    /// cryptic "expected end of line".
     public init(source: String, sourceName: String) {
         self.sourceName = sourceName
-        self.chars = Array(source)
+        let bomStripped = source.hasPrefix("\u{feff}") ? String(source.dropFirst()) : source
+        self.chars = Array(bomStripped
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n"))
     }
 
     private var atEnd: Bool { index >= chars.count }
@@ -60,6 +73,12 @@ public struct TOMLParser {
                         arrayTables[name, default: []].append(.table(TOMLTable()))
                         currentIsArray = true
                     } else {
+                        // TOML 1.0: redefining a table is an error, not a
+                        // reset. Silently discarding the earlier keys would
+                        // make users lose config data invisibly.
+                        guard tables[name] == nil else {
+                            throw fail("duplicate table '\(name)'")
+                        }
                         tables[name] = TOMLTable()
                         currentIsArray = false
                     }
@@ -92,8 +111,6 @@ public struct TOMLParser {
                     root = try setNested(into: root, keys: keys, value: value)
                 }
             }
-
-            if current == nil { break }
         }
 
         // Attach non-root tables into the root as dotted table values.
@@ -174,7 +191,7 @@ public struct TOMLParser {
     }
 
     private mutating func parseKey() throws -> String {
-        if current == "\"" { return try parseBasicString(terminator: "\"") }
+        if current == "\"" { return try parseBasicString() }
         if current == "'" { advance(); return try parseLiteralString(terminator: "'") }
         var out = ""
         while let c = current, !" \t\n.=#[]".contains(c) {
@@ -190,7 +207,7 @@ public struct TOMLParser {
     private mutating func parseValue() throws -> TOMLValue {
         switch current {
         case "\""?:
-            return .string(try parseBasicString(terminator: "\""))
+            return .string(try parseBasicString())
         case "'"?:
             advance()
             return .string(try parseLiteralString(terminator: "'"))
@@ -214,11 +231,11 @@ public struct TOMLParser {
         }
     }
 
-    private mutating func parseBasicString(terminator: Character) throws -> String {
+    private mutating func parseBasicString() throws -> String {
         advance() // consume opening quote
         var out = ""
         while let c = current {
-            if c == terminator {
+            if c == "\"" {
                 advance()
                 return out
             }
@@ -256,6 +273,11 @@ public struct TOMLParser {
     }
 
     private mutating func parseArray() throws -> TOMLValue {
+        arrayDepth += 1
+        defer { arrayDepth -= 1 }
+        guard arrayDepth <= Self.maxArrayDepth else {
+            throw fail("arrays nested deeper than \(Self.maxArrayDepth) levels")
+        }
         advance() // consume '['
         var items: [TOMLValue] = []
         while true {

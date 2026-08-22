@@ -45,59 +45,78 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
 
         let apps = NSWorkspace.shared.runningApplications
         var windows: [Window] = []
+        // Rebuilt fresh every scan so closed windows can't leave stale handles
+        // behind (the old append-only map grew without bound).
+        var resolved: [String: AXUIElement] = [:]
         for app in apps {
             guard app.activationPolicy != .prohibited, let appElement = AXUIElementCreateApplication(app.processIdentifier) as AXUIElement? else {
                 continue
             }
-            let result = enumerateWindows(of: appElement, appName: app.localizedName ?? "", bundleID: app.bundleIdentifier ?? "")
+            // Bound how long a hung app can block this scan instead of
+            // stalling on the system-wide default.
+            AXUIElementSetMessagingTimeout(appElement, Self.axTimeout)
+            let result = enumerateWindows(of: appElement, appName: app.localizedName ?? "", bundleID: app.bundleIdentifier ?? "", into: &windows, resolved: &resolved)
             switch result {
-            case .success(let found):
-                windows.append(contentsOf: found)
+            case .success:
+                break
             case .failure:
                 // Skip this app entirely; keep going. Never let one bad app abort
                 // the whole scan.
                 logger.warning("Skipping \(app.localizedName ?? "unknown app"): could not read windows")
             }
         }
+        lock.lock()
+        elementsByID = resolved
+        lock.unlock()
         return windows
     }
 
+    /// Per-element AX messaging timeout. Generous enough for healthy apps,
+    /// short enough that one wedged process can't freeze a scan.
+    private static let axTimeout: Float = 0.5
+
     private func enumerateWindows(of appElement: AXUIElement,
                                   appName: String,
-                                  bundleID: String) -> Result<[Window], MistError> {
+                                  bundleID: String,
+                                  into windows: inout [Window],
+                                  resolved: inout [String: AXUIElement]) -> Result<Void, MistError> {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &value)
         guard error == .success, let value else {
             return .failure(MistError.accessibility(description: "no windows attribute", underlying: nil))
         }
         let axWindows = (value as? [AXUIElement]) ?? []
-        var windows: [Window] = []
         for ax in axWindows {
-            guard let window = makeWindow(from: ax, appName: appName, bundleID: bundleID) else {
-                continue
+            if let window = makeWindow(from: ax, appName: appName, bundleID: bundleID, resolved: &resolved) {
+                windows.append(window)
             }
-            windows.append(window)
         }
-        return .success(windows)
+        return .success(())
     }
 
-    private func makeWindow(from element: AXUIElement, appName: String, bundleID: String) -> Window? {
+    private func makeWindow(from element: AXUIElement, appName: String, bundleID: String, resolved: inout [String: AXUIElement]) -> Window? {
         guard let title = copyString(element, kAXTitleAttribute as CFString) else { return nil }
         guard let frame = copyFrame(element) else { return nil }
 
         let identifier = copyString(element, kAXIdentifierAttribute as CFString)
-        let id: String
-        if let identifier, !identifier.isEmpty {
-            id = identifier
-        } else {
-            id = makeFallbackID(appName: appName, frame: frame)
+        let baseID = (identifier?.isEmpty == false) ? identifier! : makeFallbackID(appName: appName, frame: frame)
+
+        AXUIElementSetMessagingTimeout(element, Self.axTimeout)
+
+        // Position-derived fallback ids collide when two same-app windows sit
+        // at identical origins (freshly opened stacked windows do exactly
+        // that). Disambiguate with a suffix until the id is unique for this
+        // scan — duplicate ids previously crashed downstream dictionary work.
+        var id = baseID
+        var suffix = 2
+        while resolved[id] != nil {
+            id = "\(baseID)#\(suffix)"
+            suffix += 1
         }
 
         // Keep the live handle keyed by the same id the Window model uses so the
         // control layer can resolve it without a re-scan.
-        lock.lock()
-        elementsByID[id] = element
-        lock.unlock()
+        resolved[id] = element
 
         return Window(id: id, displayIdentifier: nil, appName: appName, title: title, bundleID: bundleID, frame: frame)
     }

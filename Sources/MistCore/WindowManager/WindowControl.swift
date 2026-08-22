@@ -58,11 +58,18 @@ public final class AccessibilityWindowControl: @unchecked Sendable, WindowContro
     private func setFrame(_ frame: CGRect, on element: AXUIElement) {
         var point = frame.origin
         if let value = AXValueCreate(.cgPoint, &point) {
-            AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value)
+            let error = AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value)
+            if error != .success {
+                // A failed move must be distinguishable from a skipped one.
+                logger.debug("setFrame: position failed with AXError \(error.rawValue)")
+            }
         }
         var size = frame.size
         if let value = AXValueCreate(.cgSize, &size) {
-            AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, value)
+            let error = AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, value)
+            if error != .success {
+                logger.debug("setFrame: size failed with AXError \(error.rawValue)")
+            }
         }
     }
 

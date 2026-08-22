@@ -79,6 +79,10 @@ public protocol WindowManaging: AnyObject {
 public final class WindowManager: WindowManaging {
     private let lock = NSLock()
     private var store: [String: Window] = [:]
+    /// Insertion-ordered window ids approximating Z-order: surviving windows
+    /// keep their relative order, newly-seen windows are appended on top.
+    /// Consumers like focus-follows-mouse rely on "later = higher".
+    private var order: [String] = []
     private var observers: [WindowObserving] = []
 
     /// Injectable focus side-effect. The app layer sets this to its AX-backed
@@ -90,14 +94,22 @@ public final class WindowManager: WindowManaging {
     public var windows: [Window] {
         lock.lock()
         defer { lock.unlock() }
-        return Array(store.values)
+        return orderedWindows
     }
 
+    /// Reconciles without ever trapping: duplicate ids (possible from
+    /// position-derived fallback ids) collapse to their last occurrence.
     public func reconcile(with newWindows: [Window]) {
         lock.lock()
-        store = Dictionary(uniqueKeysWithValues: newWindows.map { ($0.id, $0) })
+        store = Dictionary(newWindows.map { ($0.id, $0) }, uniquingKeysWith: { _, newer in newer })
+        // Dedupe defensively while preserving scan order so genuinely-new
+        // windows land on top in the order they were discovered.
+        var scanned = Set<String>()
+        let uniqueNew = newWindows.filter { scanned.insert($0.id).inserted }
+        order = computeOrder(previous: order, incoming: uniqueNew)
+        let merged = orderedWindows
         lock.unlock()
-        notifyChange(windows: newWindows)
+        notifyChange(windows: merged)
     }
 
     public func setFloating(_ floating: Bool, for windowID: String) {
@@ -121,12 +133,33 @@ public final class WindowManager: WindowManaging {
         lock.lock()
         observers.append(observer)
         // Replay current state so an observer doesn't sit in a stale "empty" state.
-        let current = Array(store.values)
+        let current = orderedWindows
         lock.unlock()
         observer.windowsDidChange(current, changed: current)
     }
 
     // MARK: helpers
+
+    /// Caller must hold `lock`. Windows in stored order.
+    private var orderedWindows: [Window] {
+        order.compactMap { store[$0] }
+    }
+
+    /// Merges previous order with the new set: surviving windows keep their
+    /// relative order (stable Z), newly-seen ids are appended on top in scan
+    /// order. Duplicate ids must never reach `order`.
+    private func computeOrder(previous: [String], incoming: [Window]) -> [String] {
+        var seen = Set<String>()
+        var merged: [String] = []
+        for id in previous where store[id] != nil {
+            if seen.insert(id).inserted { merged.append(id) }
+        }
+        for window in incoming where !seen.contains(window.id) {
+            seen.insert(window.id)
+            merged.append(window.id)
+        }
+        return merged
+    }
 
     private func update(_ windowID: String, _ mutate: (inout Window) -> Void) {
         lock.lock()
