@@ -73,7 +73,8 @@ private struct ConfigMapper {
             outerGap: clampNonNegative(t.integer(forKey: "outer_gap")),
             defaultLayout: try mapLayout(t.string(forKey: "layout")),
             animate: t.bool(forKey: "animate") ?? true,
-            animationSpeed: mapSpeed(t.string(forKey: "animation"))
+            animationSpeed: mapSpeed(t.string(forKey: "animation")),
+            focusFollowsMouse: t.bool(forKey: "focus_follows_mouse") ?? false
         )
     }
 

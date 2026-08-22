@@ -31,21 +31,25 @@ public struct GeneralSettings: Equatable, Sendable {
     public var outerGap: Int
     /// Default layout for new workspaces.
     public var defaultLayout: LayoutName
-/// Whether layout animations are enabled.
+    /// Whether layout animations are enabled.
     public var animate: Bool
     /// Curve family used when `animate` is true.
     public var animationSpeed: AnimationSpeed
+    /// Focus whatever window sits under the cursor as it moves.
+    public var focusFollowsMouse: Bool
 
     public init(gap: Int = 8,
                 outerGap: Int = 16,
                 defaultLayout: LayoutName = .bsp,
                 animate: Bool = true,
-                animationSpeed: AnimationSpeed = .spring) {
+                animationSpeed: AnimationSpeed = .spring,
+                focusFollowsMouse: Bool = false) {
         self.gap = gap
         self.outerGap = outerGap
         self.defaultLayout = defaultLayout
         self.animate = animate
         self.animationSpeed = animationSpeed
+        self.focusFollowsMouse = focusFollowsMouse
     }
 }
 

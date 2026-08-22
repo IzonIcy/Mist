@@ -9,6 +9,7 @@ import MistCore
 /// belongs in a Core module instead.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: AppCoordinator?
+    private var mouseMonitor: Any?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let buffer = NSApplication.shared
@@ -23,10 +24,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         core.bootstrap()
 
         setupMenuBar()
+        setupFocusFollowsMouseIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if let mouseMonitor {
+            NSEvent.removeMonitor(mouseMonitor)
+        }
         coordinator?.shutdown()
+    }
+
+    /// Installs a global mouse-move monitor when `focus_follows_mouse` is on.
+    /// Global monitors only see events delivered to *other* apps, which is
+    /// exactly the case we care about; Mist's own windows never need this.
+    private func setupFocusFollowsMouseIfNeeded() {
+        guard let coordinator, coordinator.focusFollowsMouseEnabled else { return }
+
+        mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .otherMouseDragged, .leftMouseDragged]) { [weak self] _ in
+            self?.coordinator?.focusWindow(at: Self.cgPoint(from: NSEvent.mouseLocation))
+        }
+    }
+
+    /// AppKit's global mouse location is bottom-left origin; the window frames
+    /// from AX are top-left origin (CG coordinates). Convert before lookup.
+    private static func cgPoint(from appKitPoint: NSPoint) -> CGPoint {
+        let screenHeight = NSScreen.screens.map(\.frame.maxY).max() ?? 0
+        return CGPoint(x: appKitPoint.x, y: screenHeight - appKitPoint.y)
     }
 
     /// Minimal menu bar presence so the app is discoverable / un-quittable on

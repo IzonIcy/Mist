@@ -29,6 +29,8 @@ public final class AppCoordinator {
     private var currentConfig = MistConfig()
     private var permissionGranted = false
     private var subscriptions: Set<AnyCancellable> = []
+    private var lastMouseFocusAt: ContinuousClock.Instant?
+    private var lastMouseFocusedWindowID: String?
 
     public init(eventBus: EventPublishing,
                 logger: Logger = .shared,
@@ -106,6 +108,36 @@ public final class AppCoordinator {
         // Bookkeeping-side focus forwards to the real AX focus.
         windowManager.focusHandler = { [weak self] windowID in
             self?.windowControl.focus(windowID: windowID)
+        }
+    }
+
+    // MARK: focus-follows-mouse seam
+
+    /// Whether the feature is switched on in config (the App layer checks
+    /// this before installing its global event monitor).
+    public var focusFollowsMouseEnabled: Bool {
+        currentConfig.general.focusFollowsMouse
+    }
+
+    /// Focuses the managed window under `point` (top-left-origin CG coords),
+    /// honoring the pure FocusFollowsMouse guards. Called by the App layer's
+    /// global mouse monitor when the feature is enabled in config.
+    public func focusWindow(at point: CGPoint) {
+        guard currentConfig.general.focusFollowsMouse else { return }
+        let windows = windowManager.windows
+        let candidate = FocusFollowsMouse.window(at: point, in: windows)?.id
+        let now = ContinuousClock.now
+        guard FocusFollowsMouse.shouldFocus(
+            candidateID: candidate,
+            currentlyFocusedID: lastMouseFocusedWindowID,
+            lastFocusedAt: lastMouseFocusAt,
+            now: now
+        ) else { return }
+
+        lastMouseFocusAt = now
+        if let candidate {
+            lastMouseFocusedWindowID = candidate
+            windowControl.focus(windowID: candidate)
         }
     }
 
