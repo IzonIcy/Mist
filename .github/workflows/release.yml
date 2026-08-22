@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build (release)
+        run: swift build -c release
+      - name: Package
+        run: |
+          dir="Mist-${GITHUB_REF_NAME#v}-aarch64-apple-darwin"
+          mkdir "$dir"
+          cp .build/release/Mist "$dir/"
+          cp README.md LICENSE "$dir/"
+          zip -r "$dir.zip" "$dir"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"
+          generate_release_notes: true
