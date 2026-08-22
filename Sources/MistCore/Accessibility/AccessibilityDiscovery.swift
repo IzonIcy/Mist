@@ -99,7 +99,12 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         guard let frame = copyFrame(element) else { return nil }
 
         let identifier = copyString(element, kAXIdentifierAttribute as CFString)
-        let baseID = (identifier?.isEmpty == false) ? identifier! : makeFallbackID(appName: appName, frame: frame)
+        let baseID: String
+        if let identifier, !identifier.isEmpty {
+            baseID = identifier
+        } else {
+            baseID = makeFallbackID(appName: appName, frame: frame)
+        }
 
         AXUIElementSetMessagingTimeout(element, Self.axTimeout)
 

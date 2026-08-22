@@ -137,6 +137,19 @@ struct TOMLParserTests {
         }
     }
 
+    @Test func tableThenArrayOfTablesThrows() {
+        // [t] followed by [[t]] redefines the same name with a different kind.
+        #expect(throws: MistError.self) {
+            _ = try parse("[t]\na = 1\n[[t]]\nb = 2")
+        }
+    }
+
+    @Test func arrayOfTablesThenTableThrows() {
+        #expect(throws: MistError.self) {
+            _ = try parse("[[t]]\nb = 2\n[t]\na = 1")
+        }
+    }
+
     @Test func parsesCRLFLineEndings() throws {
         let doc = try parse("gap = 8\r\n# comment\r\nname = \"m\"\r\n")
         #expect(doc.root.integer(forKey: "gap") == 8)

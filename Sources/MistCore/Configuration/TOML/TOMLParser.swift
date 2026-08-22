@@ -17,6 +17,11 @@ import Foundation
 ///
 /// Not yet supported (rejected with a `MistError` naming the line):
 ///   - multi-line (`"""`) strings, datetimes, inline tables, nested arrays
+///
+/// Known limitation (pre-existing): sub-tables of array-of-tables entries
+/// (`[[t]]` combined with `[t.u]`) attach in dictionary order at assembly
+/// time, so mixing both for the same root name may mis-nest instead of
+/// erroring. Mist's config schema doesn't use this shape.
 public struct TOMLParser {
     private let sourceName: String
     private var chars: [Character]
@@ -70,13 +75,18 @@ public struct TOMLParser {
                 } else {
                     let name = keys.joined(separator: ".")
                     if isArray {
+                        // TOML 1.0 also forbids redefining a table as an
+                        // array-of-tables (or vice versa).
+                        guard tables[name] == nil else {
+                            throw fail("'\(name)' already defined as a table")
+                        }
                         arrayTables[name, default: []].append(.table(TOMLTable()))
                         currentIsArray = true
                     } else {
                         // TOML 1.0: redefining a table is an error, not a
                         // reset. Silently discarding the earlier keys would
                         // make users lose config data invisibly.
-                        guard tables[name] == nil else {
+                        guard tables[name] == nil, arrayTables[name] == nil else {
                             throw fail("duplicate table '\(name)'")
                         }
                         tables[name] = TOMLTable()
