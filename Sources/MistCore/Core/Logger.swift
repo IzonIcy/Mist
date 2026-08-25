@@ -35,7 +35,7 @@ public protocol LogSink: AnyObject {
 
 /// Writes log lines to standard error.
 ///
-/// `stderr` is the correct default for diagnostics — app UI and tools often
+/// `stderr` is the correct default for diagnostics: app UI and tools often
 /// consume stdout, and diagnostics belong on the error channel.
 public final class StandardErrorSink: LogSink {
     private let file: UnsafeMutablePointer<FILE>

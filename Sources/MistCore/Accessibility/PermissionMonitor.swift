@@ -22,7 +22,7 @@ public final class AccessibilityMonitor: @unchecked Sendable {
     private var started = false
 
     /// Poll interval (seconds). `AXIsProcessTrusted` is cheap, so a modest
-    /// interval is fine — this is not a busy loop.
+    /// interval is fine; this is not a busy loop.
     public let pollInterval: TimeInterval
 
     public init(trust: any AccessibilityTrustChecking,

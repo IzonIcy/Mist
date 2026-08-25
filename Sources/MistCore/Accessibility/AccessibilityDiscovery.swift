@@ -7,7 +7,7 @@ import CoreGraphics
 ///
 /// AX is inherently best-effort: a window can vanish mid-read, an app can be
 /// unresponsive, and attributes can be missing. Every failure path is handled
-/// here — a single window that fails to read is skipped, never fatal. Only
+/// here: a single window that fails to read is skipped, never fatal. Only
 /// inputs we cannot even begin (no trust) throw.
 public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElementProviding {
     /// The trust checker used to short-circuit before hitting AX APIs.
@@ -36,8 +36,8 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
     /// Enumerates visible top-level windows as `Window` models.
     /// This is the data source for the `WindowManager`'s reconcile() pass.
     ///
-    /// When permission is missing, returns a *non-fatal* result and logs WARNING
-    /// — the app must not crash on a missing permission, it must guide the user.
+    /// When permission is missing, returns a *non-fatal* result and logs WARNING;
+    /// the app must not crash on a missing permission, it must guide the user.
     public func scanWindows() throws -> [Window] {
         guard trust.isTrusted else {
             throw MistError.accessibility(description: "accessibility permission not granted", underlying: nil)
@@ -111,7 +111,7 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         // Position-derived fallback ids collide when two same-app windows sit
         // at identical origins (freshly opened stacked windows do exactly
         // that). Disambiguate with a suffix until the id is unique for this
-        // scan — duplicate ids previously crashed downstream dictionary work.
+        // scan; duplicate ids previously crashed downstream dictionary work.
         var id = baseID
         var suffix = 2
         while resolved[id] != nil {

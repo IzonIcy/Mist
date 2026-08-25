@@ -3,7 +3,7 @@ import ApplicationServices
 
 /// The lifecycle of the accessibility permission.
 ///
-/// Toggling the permission in System Settings makes the current *process* stale —
+/// Toggling the permission in System Settings makes the current *process* stale:
 /// `AXIsProcessTrusted` stops reflecting reality until relaunch. The enum encodes
 /// the states Mist can actually be in so the app can detect the permission
 /// vanishing and *recover* instead of crashing (charter: "gracefully recover

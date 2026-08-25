@@ -1,7 +1,7 @@
 import AppKit
 import MistCore
 
-/// The application delegate — the *thin* tip of Mist.
+/// The application delegate: the *thin* tip of Mist.
 ///
 /// Per the charter, business logic must never depend on UI. This type owns only
 /// AppKit lifecycle and hands the heavy lifting to `AppCoordinator` (pure
@@ -15,7 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Build the Core stack and start it.
         let core = AppCoordinator(
             eventBus: EventBus(),
             logger: .shared
@@ -48,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// AppKit's global mouse location is bottom-left origin; the window frames
     /// from AX are top-left origin (CG coordinates). Convert before lookup.
     /// Both spaces anchor to the *primary* screen, so its height is the right
-    /// pivot — using the tallest screen breaks vertically-stacked displays.
+    /// pivot; using the tallest screen breaks vertically-stacked displays.
     private static func cgPoint(from appKitPoint: NSPoint) -> CGPoint {
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         return CGPoint(x: appKitPoint.x, y: primaryHeight - appKitPoint.y)

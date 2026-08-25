@@ -4,14 +4,14 @@ import Combine
 /// A typed, decoupled publish/subscribe bus.
 ///
 /// The app is event-driven (charter: "avoid unnecessary polling"). Modules that
-/// observe the outside world — the accessibility monitor, display monitor,
-/// hotkey listener — push events here; modules that react subscribe here.
+/// observe the outside world (the accessibility monitor, display monitor,
+/// hotkey listener) push events here; modules that react subscribe here.
 /// Nothing knows who is listening, and subscribers never block publishers
 /// because Combine's `PassthroughSubject` delivers asynchronously under the
 /// hood with any subscriber that uses `.receive(on:)` as it wishes.
 ///
 /// `Event` is the closed set of events the system currently understands. If a
-/// future feature needs a new event, add a case — the compiler then walks every
+/// future feature needs a new event, add a case: the compiler then walks every
 /// subscriber to handle it. That is the point of a closed enum: exhaustiveness.
 public enum Event: Sendable {
     /// System finished booting (permissions verified, config loaded).
@@ -37,7 +37,7 @@ public enum Event: Sendable {
     case hotkeyTriggered(key: String)
 }
 
-/// Where a configuration load came from — used by subscribers that want to
+/// Where a configuration load came from; used by subscribers that want to
 /// rebuild vs. just refresh.
 public enum ConfigurationSource: Sendable {
     case initial
@@ -55,7 +55,7 @@ public protocol EventPublishing: AnyObject {
 
 /// Default `EventPublishing` implementation backed by a `PassthroughSubject`.
 ///
-/// It is a class (not a struct) because it is shared, and it is small — one
+/// It is a class (not a struct) because it is shared, and it is small: one
 /// subject, two methods. It does not try to be a general-purpose bus; when a
 /// specific module needs strongly-typed events *in addition* to the global
 /// ones, it uses its own subject (see `WindowObserver`).

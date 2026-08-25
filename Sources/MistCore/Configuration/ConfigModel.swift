@@ -4,7 +4,7 @@ import Foundation
 ///
 /// This is the "golden" value type every runtime module consumes. It is separate
 /// from the raw TOML tree (`TOMLTable`) so parsing (syntax) and validation
-/// (semantics) are two distinct phases — a malformed doc can never be
+/// (semantics) are two distinct phases; a malformed doc can never be
 /// half-applied, because conversion is all-or-nothing.
 public struct MistConfig: Sendable {
     /// Values from the `[general]` section.

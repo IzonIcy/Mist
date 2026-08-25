@@ -5,8 +5,8 @@ import CoreGraphics
 ///
 /// The frame is in **top-left-origin display coordinates** (the same convention
 /// the `Display` model and every `Layout` returns). Converting to the
-/// Accessibility API's own coordinate space happens later in the AX layer — never
-/// here — so this module stays pure and testable.
+/// Accessibility API's own coordinate space happens later, in the AX layer, so
+/// this module stays pure and testable.
 public typealias WindowPlan = [String: CGRect]
 
 /// Computes the layout plan for a set of windows on a display.

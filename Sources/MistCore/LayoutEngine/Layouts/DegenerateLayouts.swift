@@ -66,7 +66,7 @@ public struct MonocleLayout: Layout {
 
 /// Floating layout: a *no-op* arrangement.
 ///
-/// Windows matched by "float" are not placed by the engine at all — the window
+/// Windows matched by "float" are not placed by the engine at all; the window
 /// manager keeps their current sizes. `arrange` returning an empty result is the
 /// honest contract: there is no frame to compute here, and forcing one would
 /// violate the meaning of "floating". The manager treats an empty result as

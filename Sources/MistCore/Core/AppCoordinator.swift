@@ -5,7 +5,7 @@ import CoreGraphics
 /// Glues the Core modules into a running system.
 ///
 /// This is the only place that knows how the pieces fit together, so wiring a
-/// change stays a single file. It is pure `MistCore` logic — no AppKit — which
+/// change stays a single file. It is pure `MistCore` logic (no AppKit), which
 /// keeps the app target a thin shell and lets this be reasoned about (and later
 /// tested) in isolation.
 public final class AppCoordinator {
@@ -77,7 +77,7 @@ public final class AppCoordinator {
             }
             apply(config)
         } catch {
-            // Bad/missing config must never crash launch — and a *failed
+            // Bad/missing config must never crash launch, and a *failed
             // reload* must never wipe the user's settings. First load falls
             // back to defaults; afterwards we keep the last-good config.
             logger.error("Failed to load config: \(String(describing: error))")

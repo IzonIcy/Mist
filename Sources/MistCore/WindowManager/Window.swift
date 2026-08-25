@@ -56,7 +56,7 @@ public protocol WindowObserving: AnyObject {
 /// Owns the current set of windows and the operations the manager exposes.
 ///
 /// The manager is stateful (it holds the tracked windows) but the mutations that
-/// matter — add/remove/move — are passed through an observer protocol so the
+/// matter (add/remove/move) are passed through an observer protocol so the
 /// rest of the app can subscribe without owning the state.
 public protocol WindowManaging: AnyObject {
     /// Current managed windows.

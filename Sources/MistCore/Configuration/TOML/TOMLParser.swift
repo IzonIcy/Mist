@@ -329,7 +329,7 @@ public struct TOMLParser {
     ///
     /// Deliberately recursive: `TOMLTable` is a value type, so mutating a nested
     /// path means rebuilding every ancestor on the way back up. The recursion
-    /// mirrors exactly that — one key at a time, bottom-up.
+    /// mirrors exactly that: one key at a time, bottom-up.
     private func setNested(into table: TOMLTable, keys: [String], value: TOMLValue) throws -> TOMLTable {
         guard let first = keys.first, !keys.isEmpty else {
             throw fail("empty key path")

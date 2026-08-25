@@ -5,7 +5,7 @@ import CoreGraphics
 ///
 /// Windows are recursively divided: the container splits roughly in half, then
 /// each half splits again in the *other* axis at the next level. Interleaving the
-/// split axis is why this is called BSP — it's the classic recursive bisection
+/// split axis is why this is called BSP: it's the classic recursive bisection
 /// that keeps windows near-equal in area while giving each its own slot.
 ///
 /// - 1 window: fills the rect.

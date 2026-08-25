@@ -2,7 +2,7 @@ import Foundation
 
 /// The root error type for every failure the app knows how to *name*.
 ///
-/// The charter says never to ignore errors — every failure should carry
+/// The charter says never to ignore errors: every failure should carry
 /// context. This single type lets each layer describe failures in a way that
 /// can be surfaced to the log and, where appropriate, the user, without anyone
 /// guessing from a raw `Code`.
@@ -24,7 +24,7 @@ public enum MistError: Error, CustomStringConvertible {
     case displayNotFound(String)
 
     /// A required accessibility operation failed (missing permission, element
-    /// went away, etc.). Never crashes — callers catch and downgrade.
+    /// went away, etc.). Never crashes; callers catch and downgrade.
     case accessibility(description: String, underlying: Error?)
 
     /// Two distinct actions claim the same hotkey.
