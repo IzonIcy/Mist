@@ -21,7 +21,7 @@ jobs:
           cp .build/release/Mist "$dir/"
           cp README.md LICENSE "$dir/"
           zip -r "$dir.zip" "$dir"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: "*.zip"
           generate_release_notes: true
