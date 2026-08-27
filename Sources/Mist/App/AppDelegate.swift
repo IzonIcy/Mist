@@ -62,8 +62,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: "Mist")
         }
         let menu = NSMenu()
+
+        // Permission status & prompt
+        let permItem = NSMenuItem(
+            title: "Accessibility Permission: Checking…",
+            action: #selector(openAccessibilitySettings),
+            keyEquivalent: ""
+        )
+        permItem.target = self
+        permItem.isEnabled = true
+        menu.addItem(permItem)
+        // Update after a moment once the monitor has run
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.updatePermissionMenuItem(permItem)
+        }
+
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit Mist", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
         statusItem = item
+    }
+
+    @objc private func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+
+    private func updatePermissionMenuItem(_ item: NSMenuItem) {
+        guard let coordinator else { return }
+        let granted = coordinator.isAccessibilityGranted
+        item.title = granted ? "✅ Accessibility Permission: Granted" : "⚠️ Accessibility Permission: Missing (click to fix)"
     }
 }

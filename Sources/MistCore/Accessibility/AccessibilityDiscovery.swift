@@ -124,27 +124,26 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         // them on frame + identity rather than dropping them silently.
         let title = copyString(element, kAXTitleAttribute as CFString) ?? ""
 
-        // Prefer the CGWindowID-backed identity: it survives retiles and
-        // rescans, which position-derived ids never did.
+        // CGWindowID is globally unique (assigned by WindowServer), so pid+CGWindowID
+        // is a stable, collision-free identity. No suffix dance needed.
         var cgID: UInt32 = 0
-        let baseID: String
+        let id: String
         if axGetCGWindowID(element, &cgID) == .success, cgID != 0 {
-            baseID = "\(appName)-\(pid ?? 0)-\(cgID)"
+            id = "\(pid ?? 0)-\(cgID)"
         } else if let identifier = copyString(element, kAXIdentifierAttribute as CFString), !identifier.isEmpty {
-            baseID = "\(appName)-\(identifier)"
+            id = "\(bundleID)-\(identifier)"
         } else {
-            baseID = makeFallbackID(appName: appName, frame: frame)
+            id = makeFallbackID(appName: appName, frame: frame)
         }
 
         AXUIElementSetMessagingTimeout(element, Self.axTimeout)
 
-        // Disambiguate collisions until the id is unique for this scan;
-        // duplicate ids previously crashed downstream dictionary work.
-        var id = baseID
-        var suffix = 2
-        while resolved[id] != nil {
-            id = "\(baseID)#\(suffix)"
-            suffix += 1
+        // CGWindowID collisions are virtually impossible (WindowServer guarantees
+        // uniqueness). If we somehow hit one, log and skip rather than generating
+        // unstable suffixed IDs that break reconciliation across scans.
+        if resolved[id] != nil {
+            logger.warning("Duplicate window ID \(id) in scan — skipping")
+            return nil
         }
 
         // Keep the live handle keyed by the same id the Window model uses so the

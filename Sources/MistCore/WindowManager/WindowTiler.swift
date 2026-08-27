@@ -43,6 +43,11 @@ public struct WindowTiler {
         let items = tiled.map { LayoutItem(id: LayoutItemID($0.id)) }
         let frames = layout.arrange(items: items, in: display, config: config)
 
-        return Dictionary(uniqueKeysWithValues: frames.map { ($0.key.rawValue, $0.value) })
+        // Use uniquingKeysWith to avoid trapping if the layout engine ever
+        // returns duplicate keys (shouldn't happen, but defensive).
+        return Dictionary(
+            frames.map { ($0.key.rawValue, $0.value) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 }

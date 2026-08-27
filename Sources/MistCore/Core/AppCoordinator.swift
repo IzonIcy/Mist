@@ -172,6 +172,11 @@ public final class AppCoordinator {
         currentConfig.general.focusFollowsMouse
     }
 
+    /// Current accessibility permission state.
+    public var isAccessibilityGranted: Bool {
+        permissionGranted
+    }
+
     /// Focuses the managed window under `point` (top-left-origin CG coords),
     /// honoring the pure FocusFollowsMouse guards. Called by the App layer's
     /// global mouse monitor when the feature is enabled in config.
@@ -243,11 +248,11 @@ public final class AppCoordinator {
     /// Bakes matched-rule actions into the scanned windows before reconcile.
     /// Rules re-evaluate every scan, so the config stays the single source of
     /// truth for float/always-on-top state. Monitor/workspace/layout actions
-    /// need multi-display targeting that hasn't landed; they're skipped with
-    /// a debug note instead of silently ignored.
+    /// are now wired to the display and workspace managers.
     private func applyRules(to windows: inout [Window]) {
         guard !currentConfig.rules.isEmpty else { return }
         let engine = RuleEngine(rules: currentConfig.rules)
+        let displays = displayManager.displays
         for index in windows.indices {
             for action in engine.actions(for: windows[index].snapshot) {
                 switch action {
@@ -255,8 +260,39 @@ public final class AppCoordinator {
                     windows[index].isFloating = value
                 case .alwaysOnTop(let value):
                     windows[index].isAlwaysOnTop = value
-                case .monitor, .workspace, .layout:
-                    logger.debug("Rule action pending multi-display support: \(String(describing: action))")
+                case .monitor(let displayIndex):
+                    // Display index in config is 1-based; map to actual display.
+                    let targetIndex = displayIndex - 1
+                    if targetIndex >= 0 && targetIndex < displays.count {
+                        let targetDisplay = displays[targetIndex]
+                        // Move window to this display's workspace (or create one)
+                        let workspaceID = "display-\(targetDisplay.id)"
+                        if workspaceManager.workspace(id: workspaceID) == nil {
+                            workspaceManager.add(Workspace(id: workspaceID, name: workspaceID, layout: .bsp, displayID: targetDisplay.id))
+                        }
+                        workspaceManager.move(windowID: windows[index].id, to: workspaceID)
+                        displayManager.assign(workspace: workspaceID, to: targetDisplay.id)
+                    }
+                case .workspace(let workspaceID):
+                    // Ensure workspace exists with a default layout
+                    if workspaceManager.workspace(id: workspaceID) == nil {
+                        workspaceManager.add(Workspace(id: workspaceID, name: workspaceID, layout: .bsp))
+                    }
+                    workspaceManager.move(windowID: windows[index].id, to: workspaceID)
+                case .layout(let layoutName):
+                    // Set layout on the window's current workspace (or active)
+                    let windowID = windows[index].id
+                    var targetWorkspaceID: String?
+                    for ws in workspaceManager.workspaces where ws.windowIDs.contains(windowID) {
+                        targetWorkspaceID = ws.id
+                        break
+                    }
+                    targetWorkspaceID = targetWorkspaceID ?? workspaceManager.activeWorkspaceID
+                    if let wsID = targetWorkspaceID,
+                       var ws = workspaceManager.workspace(id: wsID) {
+                        ws.layout = layoutName
+                        workspaceManager.add(ws) // update
+                    }
                 }
             }
         }

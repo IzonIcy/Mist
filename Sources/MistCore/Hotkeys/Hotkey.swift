@@ -102,7 +102,12 @@ extension HotkeyManager: HotkeyManaging {
         lock.lock()
         defer { lock.unlock() }
         self.map = byKey
-        self.names = Dictionary(uniqueKeysWithValues: bindings.filter { $0.name.count > 0 }.map { ($0.name, $0.key) })
+        // Use uniquingKeysWith to avoid trapping on duplicate binding names.
+        // If duplicates exist (shouldn't happen with validated config), keep the first.
+        self.names = Dictionary(
+            bindings.filter { $0.name.count > 0 }.map { ($0.name, $0.key) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     public func clear() {
