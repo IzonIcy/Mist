@@ -99,9 +99,20 @@ public final class WindowManager: WindowManaging {
 
     /// Reconciles without ever trapping: duplicate ids (possible from
     /// position-derived fallback ids) collapse to their last occurrence.
+    /// Windows that survive the scan keep their float/always-on-top flags —
+    /// a rescan is an update, not a reset.
     public func reconcile(with newWindows: [Window]) {
         lock.lock()
+        let previous = store
         store = Dictionary(newWindows.map { ($0.id, $0) }, uniquingKeysWith: { _, newer in newer })
+        for (id, window) in store {
+            if let old = previous[id] {
+                var carried = window
+                carried.isFloating = old.isFloating
+                carried.isAlwaysOnTop = old.isAlwaysOnTop
+                store[id] = carried
+            }
+        }
         // Dedupe defensively while preserving scan order so genuinely-new
         // windows land on top in the order they were discovered.
         var scanned = Set<String>()

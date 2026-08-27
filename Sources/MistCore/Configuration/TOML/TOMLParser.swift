@@ -348,6 +348,10 @@ public struct TOMLParser {
         let child: TOMLTable
         if let existing = copy.value(forKey: first), case let .table(t) = existing {
             child = t
+        } else if copy.value(forKey: first) != nil {
+            // A non-table value blocks the intermediate key: `a = 1` before
+            // `[a.b]` is a redefinition error, not silent replacement.
+            throw fail("'\(first)' already defined as a value")
         } else {
             child = TOMLTable()
         }

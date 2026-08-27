@@ -16,7 +16,7 @@ public struct ConfigLoader {
         self.fileManager = fileManager
     }
 
-    /// The default config URL, e.g. `~/.config/mist/mist.toml`.
+    /// The default config URL: `~/Library/Application Support/Mist/mist.toml`.
     public func defaultConfigURL() -> URL? {
         guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil

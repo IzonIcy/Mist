@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import CoreGraphics
+import Carbon.HIToolbox
 
 /// Glues the Core modules into a running system.
 ///
@@ -18,6 +19,8 @@ public final class AppCoordinator {
     private let workspaceManager = WorkspaceManager()
     private var hotkeyManager: HotkeyManager?
     private var accessibilityMonitor: AccessibilityMonitor?
+    /// Live handle for the CGEventTap; nil until permission is granted.
+    private var eventTap: CFMachPort?
 
     // Accessibility stack. Discovered lazily so permission state and this wiring
     // stay coherent: discovery caches live AX elements, control applies them.
@@ -32,6 +35,7 @@ public final class AppCoordinator {
     private var subscriptions: Set<AnyCancellable> = []
     private var lastMouseFocusAt: ContinuousClock.Instant?
     private var lastMouseFocusedWindowID: String?
+    private var configWatcher: DispatchSourceFileSystemObject?
 
     public init(eventBus: EventPublishing,
                 logger: Logger = .shared,
@@ -55,7 +59,11 @@ public final class AppCoordinator {
         wireEvents()
         if permissionGranted {
             refreshWindows() // already trusted (e.g. relaunch) → reconcile pro-actively
+            startHotkeyTap()
+        } else {
+            trust.requestPermission()
         }
+        watchConfigFile()
         wireFocusSeam()
         logger.info("Mist booted")
         eventBus.publish(.didFinishLaunching)
@@ -63,6 +71,11 @@ public final class AppCoordinator {
 
     public func shutdown() {
         accessibilityMonitor?.stop()
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFMachPortInvalidate(eventTap)
+        }
+        configWatcher?.cancel()
     }
 
     // MARK: configuration
@@ -99,6 +112,40 @@ public final class AppCoordinator {
             logger.error("Hotkey conflict detected: \(String(describing: error))")
         }
         eventBus.publish(.configurationDidChange(source: .initial))
+    }
+
+    /// Watches the config file so edits apply live. A parse failure keeps the
+    /// last-good config (the watcher just waits for the next edit).
+    private func watchConfigFile() {
+        guard let url = configLoader.defaultConfigURL(), FileManager.default.fileExists(atPath: url.path) else {
+            return
+        }
+        // Re-arm on every change: DispatchSource consumes its descriptor's
+        // interest after one fire when the file is replaced by an editor.
+        let armWatcher: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.configWatcher?.cancel()
+            let fd = open(url.path, O_EVTONLY)
+            guard fd >= 0 else { return }
+            let source = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: fd,
+                eventMask: [.write, .delete, .rename],
+                queue: .main
+            )
+            source.setEventHandler { [weak self] in
+                self?.loadConfiguration()
+                self?.refreshWindows()
+                self?.armConfigWatcher()
+            }
+            source.setCancelHandler { close(fd) }
+            source.resume()
+            self.configWatcher = source
+        }
+        armWatcher()
+    }
+
+    fileprivate func armConfigWatcher() {
+        watchConfigFile()
     }
 
     // MARK: accessibility
@@ -164,6 +211,7 @@ public final class AppCoordinator {
             permissionGranted = granted
             if granted {
                 refreshWindows()
+                startHotkeyTap()
             } else {
                 // Permission revoked mid-run: no AX calls until it flips back.
                 windowManager.reconcile(with: [])
@@ -176,17 +224,41 @@ public final class AppCoordinator {
 
     // MARK: reconcile + tile
 
-    /// The core gesture: snapshot windows, reconcile the manager, compute a
-    /// frame plan, and apply it. Called on boot and any time permission returns.
+    /// The core gesture: snapshot windows, apply config rules, reconcile the
+    /// manager, compute a frame plan, and apply it. Called on boot, any time
+    /// permission returns, and after a config edit.
     private func refreshWindows() {
         guard permissionGranted else { return }
         do {
-            let windows = try discovery.scanWindows()
+            var windows = try discovery.scanWindows()
+            applyRules(to: &windows)
             windowManager.reconcile(with: windows)
             retile(windows: windows)
         } catch {
             // Missing/changed permission mid-scan: not fatal, log and wait.
             logger.error("Window scan failed: \(String(describing: error))")
+        }
+    }
+
+    /// Bakes matched-rule actions into the scanned windows before reconcile.
+    /// Rules re-evaluate every scan, so the config stays the single source of
+    /// truth for float/always-on-top state. Monitor/workspace/layout actions
+    /// need multi-display targeting that hasn't landed; they're skipped with
+    /// a debug note instead of silently ignored.
+    private func applyRules(to windows: inout [Window]) {
+        guard !currentConfig.rules.isEmpty else { return }
+        let engine = RuleEngine(rules: currentConfig.rules)
+        for index in windows.indices {
+            for action in engine.actions(for: windows[index].snapshot) {
+                switch action {
+                case .float(let value):
+                    windows[index].isFloating = value
+                case .alwaysOnTop(let value):
+                    windows[index].isAlwaysOnTop = value
+                case .monitor, .workspace, .layout:
+                    logger.debug("Rule action pending multi-display support: \(String(describing: action))")
+                }
+            }
         }
     }
 
@@ -204,6 +276,104 @@ public final class AppCoordinator {
         let plan = tiler.plan(for: windows)
         windowControl.apply(plan)
         logger.debug("Applied \(plan.count) frames on \(windows.count) windows")
+    }
+
+    // MARK: hotkeys
+
+    // The tap callback runs on the main run loop only, so this handoff is
+    // single-threaded in practice; unsafe-static keeps Swift 6 happy.
+    nonisolated(unsafe) private static var activeCoordinator: AppCoordinator?
+
+    /// Installs a HID-level key tap so configured bindings fire system-wide.
+    /// Matched events are consumed; everything else passes through untouched.
+    private func startHotkeyTap() {
+        guard eventTap == nil else { return }
+        Self.activeCoordinator = self
+        let callback: CGEventTapCallBack = { _, type, event, _ in
+            guard type == .keyDown,
+                  AppCoordinator.activeCoordinator?.handleKeyEvent(event) == true else {
+                return Unmanaged.passUnretained(event)
+            }
+            return nil // swallow the key we acted on
+        }
+        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+        guard let tap = CGEvent.tapCreate(
+            tap: .cghidEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: mask,
+            callback: callback,
+            userInfo: nil
+        ) else {
+            logger.error("Could not create hotkey event tap (input monitoring permission missing?)")
+            return
+        }
+        eventTap = tap
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode)
+        CGEvent.tapEnable(tap: tap, enable: true)
+    }
+
+    /// Returns true when the event matched a binding and was handled.
+    private func handleKeyEvent(_ event: CGEvent) -> Bool {
+        guard let hotkeyManager else { return false }
+        var modifiers: ModifierMask = []
+        if event.flags.contains(.maskCommand) { modifiers.insert(.command) }
+        if event.flags.contains(.maskAlternate) { modifiers.insert(.option) }
+        if event.flags.contains(.maskControl) { modifiers.insert(.control) }
+        if event.flags.contains(.maskShift) { modifiers.insert(.shift) }
+        let key = Hotkey(keyCode: UInt16(event.getIntegerValueField(.keyboardEventKeycode)), modifiers: modifiers)
+        guard let action = hotkeyManager.action(for: key) else { return false }
+        performAction(action)
+        return true
+    }
+
+    /// Dispatches a bound hotkey name to its behavior. The names are the
+    /// binding keys from `[hotkeys]`, documented in the example config.
+    private func performAction(_ action: String) {
+        switch action {
+        case "focus_left", "focus_right", "focus_up", "focus_down":
+            let direction: FocusDirection = action.hasSuffix("left") ? .left
+                : action.hasSuffix("right") ? .right
+                : action.hasSuffix("up") ? .up
+                : .down
+            focusDirectional(direction)
+        case "toggle_float":
+            toggleFloatFocused()
+        default:
+            logger.debug("No behavior bound to hotkey action '\(action)' yet")
+        }
+    }
+
+    /// Focused-window lookup goes through the system-wide AX element, then is
+    /// translated into a managed id via the discovery cache.
+    private func focusedWindowID() -> String? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedWindowAttribute as CFString, &value) == .success,
+              let value else { return nil }
+        let focusedElement = value as! AXUIElement
+        return discovery.windowID(for: focusedElement)
+    }
+
+    private func focusDirectional(_ direction: FocusDirection) {
+        let windows = windowManager.windows
+        guard let target = WindowNavigation.nextWindow(from: focusedWindowID(), in: windows, direction: direction) else {
+            logger.debug("No window to focus \(String(describing: direction))")
+            return
+        }
+        windowControl.focus(windowID: target.id)
+    }
+
+    private func toggleFloatFocused() {
+        guard let id = focusedWindowID() ?? lastMouseFocusedWindowID else {
+            logger.debug("toggle_float: no focused window")
+            return
+        }
+        let windows = windowManager.windows
+        guard let current = windows.first(where: { $0.id == id }) else { return }
+        windowManager.setFloating(!current.isFloating, for: id)
+        retile(windows: windowManager.windows)
     }
 }
 

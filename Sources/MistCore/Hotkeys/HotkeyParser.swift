@@ -34,8 +34,8 @@ struct HotkeyConfigurationParser {
         guard let last = parts.last else {
             throw MistError.invalidConfiguration("empty hotkey '\(raw)'")
         }
-        let keyCode = keyCode(for: last)
-        guard keyCode != 0 else {
+        // kVK_ANSI_A is 0, so the sentinel must be nil — not zero.
+        guard let keyCode = keyCode(for: last) else {
             throw MistError.invalidConfiguration("unrecognized key '\(last)' in hotkey '\(raw)'")
         }
 
@@ -54,7 +54,9 @@ struct HotkeyConfigurationParser {
     }
 
     /// Maps a key name (e.g. "h", "8", "return") to a Carbon key code.
-    private static func keyCode(for name: String) -> UInt16 {
+    /// Returns nil for unknown key names. Note kVK_ANSI_A == 0, which is
+    /// exactly why this returns an Optional instead of a zero sentinel.
+    private static func keyCode(for name: String) -> UInt16? {
         switch name.lowercased() {
         case "a": return UInt16(kVK_ANSI_A)
         case "b": return UInt16(kVK_ANSI_B)
@@ -97,8 +99,7 @@ struct HotkeyConfigurationParser {
         case "space": return UInt16(kVK_Space)
         case "backspace", "delete": return UInt16(kVK_ForwardDelete)
         default:
-            // Unknown key name. Return 0 so callers can reject it cleanly.
-            return 0
+            return nil
         }
     }
 }

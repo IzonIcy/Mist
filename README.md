@@ -5,10 +5,13 @@
 A tiling window manager for macOS, built from the ground up as a modern, open,
 well-typed alternative to yabai / aerospace.
 
-> **Status: wiring landed.** Config schema, layout engine, rules, hotkeys, and
-> animations are in. The AX layer is now wired end-to-end: scan → reconcile →
-> tile → apply frames to real windows, plus focus. Runtime still needs a GUI +
-> Accessibility grant to observe; the pure middleware is unit-verified.
+> **Status: functional.** Scan → reconcile → tile → apply works against real
+> windows. Rules (float / always_on_top) and hotkeys (focus_left/right/up/down,
+> toggle_float) are wired through a CGEventTap. Config hot-reloads live.
+> Not wired yet: `monitor`/`workspace`/`layout` rule actions (they need
+> multi-display targeting) and layout animations (`animate`/`animation` are
+> parsed but have no effect yet). Runtime needs Accessibility + Input
+> Monitoring grants; the pure middleware is unit-verified.
 
 ## Why
 

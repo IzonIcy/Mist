@@ -150,6 +150,14 @@ struct TOMLParserTests {
         }
     }
 
+    @Test func scalarThenSubtableThrows() {
+        // `a = 1` before `[a.b]`: the value blocks the intermediate key, so
+        // this is a redefinition error — not silent replacement of `a`.
+        #expect(throws: MistError.self) {
+            _ = try parse("a = 1\n[a.b]\nc = 2")
+        }
+    }
+
     @Test func parsesCRLFLineEndings() throws {
         let doc = try parse("gap = 8\r\n# comment\r\nname = \"m\"\r\n")
         #expect(doc.root.integer(forKey: "gap") == 8)

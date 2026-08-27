@@ -1,5 +1,5 @@
 import Foundation
-import ApplicationServices
+@preconcurrency import ApplicationServices
 
 /// The lifecycle of the accessibility permission.
 ///
@@ -30,6 +30,10 @@ public protocol AccessibilityTrustChecking {
 
 /// Default `AccessibilityTrustChecking` backed by the real AX APIs.
 public struct SystemAccessibilityTrust: AccessibilityTrustChecking {
+    // Swift 6 flags the AX global as shared mutable state; it's a constant
+    // CFString key that never changes.
+    private nonisolated(unsafe) static let promptKey: CFString = kAXTrustedCheckOptionPrompt.takeUnretainedValue()
+
     public init() {}
 
     public var isTrusted: Bool {
@@ -37,9 +41,12 @@ public struct SystemAccessibilityTrust: AccessibilityTrustChecking {
     }
 
     public func requestPermission() {
-        // `AXIsProcessTrusted()` must be called to flash the permission prompt;
-        // deliberately not throwing so we never surface a fatal error here.
-        AXIsProcessTrusted()
+        // The options-dict variant is what actually shows the System Settings
+        // prompt; the plain call only queries and would leave a first-run
+        // user staring at a silent app.
+        let key = Self.promptKey as String
+        let options = [key: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(options)
     }
 }
 

@@ -3,6 +3,12 @@ import AppKit
 import ApplicationServices
 import CoreGraphics
 
+/// The private AX entry point that maps an element to its CGWindowID.
+/// Every open-source macOS WM uses this; it's the only way to get a window
+/// identity that survives the tiler moving it around the screen.
+@_silgen_name("_AXUIElementGetWindow")
+private func axGetCGWindowID(_ element: AXUIElement, _ outID: UnsafeMutablePointer<UInt32>) -> AXError
+
 /// Discovers top-level windows via the Accessibility API.
 ///
 /// AX is inherently best-effort: a window can vanish mid-read, an app can be
@@ -33,6 +39,19 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         return elementsByID[windowID]
     }
 
+    /// Reverse of `element(for:)`: finds which managed window an AX element
+    /// belongs to. Used to translate the system-wide focused window into a
+    /// managed window id. CF equality, not identity — AX elements are
+    /// recreated between calls but compare equal for the same window.
+    public func windowID(for element: AXUIElement) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        for (id, known) in elementsByID where CFEqual(known, element) {
+            return id
+        }
+        return nil
+    }
+
     /// Enumerates visible top-level windows as `Window` models.
     /// This is the data source for the `WindowManager`'s reconcile() pass.
     ///
@@ -55,7 +74,7 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
             // Bound how long a hung app can block this scan instead of
             // stalling on the system-wide default.
             AXUIElementSetMessagingTimeout(appElement, Self.axTimeout)
-            let result = enumerateWindows(of: appElement, appName: app.localizedName ?? "", bundleID: app.bundleIdentifier ?? "", into: &windows, resolved: &resolved)
+            let result = enumerateWindows(of: appElement, pid: app.processIdentifier, appName: app.localizedName ?? "", bundleID: app.bundleIdentifier ?? "", into: &windows, resolved: &resolved)
             switch result {
             case .success:
                 break
@@ -76,6 +95,7 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
     private static let axTimeout: Float = 0.5
 
     private func enumerateWindows(of appElement: AXUIElement,
+                                  pid: pid_t,
                                   appName: String,
                                   bundleID: String,
                                   into windows: inout [Window],
@@ -87,31 +107,39 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         }
         let axWindows = (value as? [AXUIElement]) ?? []
         for ax in axWindows {
-            if let window = makeWindow(from: ax, appName: appName, bundleID: bundleID, resolved: &resolved) {
+            if let window = makeWindow(from: ax, pid: pid, appName: appName, bundleID: bundleID, resolved: &resolved) {
                 windows.append(window)
             }
         }
         return .success(())
     }
 
-    private func makeWindow(from element: AXUIElement, appName: String, bundleID: String, resolved: inout [String: AXUIElement]) -> Window? {
-        guard let title = copyString(element, kAXTitleAttribute as CFString) else { return nil }
+    private func makeWindow(from element: AXUIElement,
+                            pid: pid_t?,
+                            appName: String,
+                            bundleID: String,
+                            resolved: inout [String: AXUIElement]) -> Window? {
         guard let frame = copyFrame(element) else { return nil }
+        // Untitled windows are legitimate (many apps expose nil titles); tile
+        // them on frame + identity rather than dropping them silently.
+        let title = copyString(element, kAXTitleAttribute as CFString) ?? ""
 
-        let identifier = copyString(element, kAXIdentifierAttribute as CFString)
+        // Prefer the CGWindowID-backed identity: it survives retiles and
+        // rescans, which position-derived ids never did.
+        var cgID: UInt32 = 0
         let baseID: String
-        if let identifier, !identifier.isEmpty {
-            baseID = identifier
+        if axGetCGWindowID(element, &cgID) == .success, cgID != 0 {
+            baseID = "\(appName)-\(pid ?? 0)-\(cgID)"
+        } else if let identifier = copyString(element, kAXIdentifierAttribute as CFString), !identifier.isEmpty {
+            baseID = "\(appName)-\(identifier)"
         } else {
             baseID = makeFallbackID(appName: appName, frame: frame)
         }
 
         AXUIElementSetMessagingTimeout(element, Self.axTimeout)
 
-        // Position-derived fallback ids collide when two same-app windows sit
-        // at identical origins (freshly opened stacked windows do exactly
-        // that). Disambiguate with a suffix until the id is unique for this
-        // scan; duplicate ids previously crashed downstream dictionary work.
+        // Disambiguate collisions until the id is unique for this scan;
+        // duplicate ids previously crashed downstream dictionary work.
         var id = baseID
         var suffix = 2
         while resolved[id] != nil {
