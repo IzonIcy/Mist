@@ -388,7 +388,13 @@ public final class AppCoordinator {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(systemWide, kAXFocusedWindowAttribute as CFString, &value) == .success,
               let value else { return nil }
-        let focusedElement = value as! AXUIElement
+        // Type-check before downcasting. AX hands back whatever the focused app
+        // felt like publishing, and a forced cast on a mismatch is a fatal error
+        // that takes the event tap and the scan timer with it.
+        guard let focusedElement = asAXUIElement(value) else {
+            logger.debug("Focused window attribute was not an AXUIElement")
+            return nil
+        }
         return discovery.windowID(for: focusedElement)
     }
 

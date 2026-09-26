@@ -166,7 +166,6 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         guard CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
         return unsafeDowncast(value, to: AXValue.self)
     }
-
     private func copyFrame(_ element: AXUIElement) -> CGRect? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &value) == .success,
@@ -188,4 +187,20 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
     private func makeFallbackID(appName: String, frame: CGRect) -> String {
         "\(appName)-\(Int(frame.minX))-\(Int(frame.minY))"
     }
+}
+
+/// Interprets a `CFTypeRef` as an `AXUIElement` after verifying its type id.
+///
+/// The AX API is dynamically typed. `AXUIElementCopyAttributeValue` hands back
+/// whatever the owning app chose to publish for that attribute, and nothing
+/// checks it, so a forced cast on a mismatch is a fatal error rather than a nil.
+/// One app publishing something unexpected for an AX attribute would take the
+/// process down instead of failing a single hotkey — and Mist dying means window
+/// management stops on the desktop until it is relaunched.
+///
+/// Returning nil degrades to "that call does nothing", which is the failure mode
+/// worth having. Same pattern, and the same reasoning, as `asAXValue` above.
+func asAXUIElement(_ value: CFTypeRef) -> AXUIElement? {
+    guard CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+    return unsafeDowncast(value, to: AXUIElement.self)
 }
