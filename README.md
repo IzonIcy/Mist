@@ -6,17 +6,28 @@ A tiling window manager for macOS, built from the ground up as a modern, open,
 well-typed alternative to yabai / aerospace.
 
 > **Status: functional.** Scan → reconcile → tile → apply works against real
-> windows. Rules (float / always_on_top) and hotkeys (focus_left/right/up/down,
-> toggle_float) are wired through a CGEventTap. Config hot-reloads live.
-> Not wired yet: `monitor`/`workspace`/`layout` rule actions (they need
-> multi-display targeting) and layout animations (`animate`/`animation` are
-> parsed but have no effect yet). Runtime needs Accessibility + Input
-> Monitoring grants; the pure middleware is unit-verified.
+> windows. The `float` rule action applies, and hotkeys
+> (focus_left/right/up/down, toggle_float) are wired through a CGEventTap.
+> Config hot-reloads live.
+>
+> Parsed and accepted, but not acted on: the `monitor`, `workspace` and `layout`
+> rule actions run and write to the workspace and display stores, but nothing
+> reads those stores, so they have no effect. `always_on_top` is recorded on the
+> window model and never applied to the real window. `animate` and `animation`
+> are parsed and have no effect.
+>
+> One rough edge worth knowing: hotkey actions are raw strings, so a name Mist
+> does not recognise — including a typo — binds successfully and then never
+> fires, with only a debug line to say so.
+>
+> Runtime needs Accessibility + Input Monitoring grants; the pure middleware is
+> unit-verified.
 
 ## Why
 
 The existing options are either closed-source, abandoned, or sprawling C.
 Mist is:
+
 - **Open source** — still free, still MIT-licensed.
 - **Type-safe** — Swift enums/structs instead of stringly-typed config handling.
 - **Boring on purpose** — the config is a file, mirrors are explicit, and
