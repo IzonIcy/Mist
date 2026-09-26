@@ -60,7 +60,12 @@ public struct MonocleLayout: Layout {
 
     public func arrange(items: [LayoutItem], in rect: CGRect, config: LayoutConfig) -> LayoutResult {
         let usable = insetRect(rect, by: config.outerGap)
-        return Dictionary(uniqueKeysWithValues: items.map { ($0.id, usable.standardized) })
+        // `uniquingKeysWith` rather than `uniqueKeysWithValues`, which traps on a
+        // duplicate id. Item ids come from window ids, and a duplicate must not
+        // take the process down. Every item maps to the same frame here, so which
+        // one survives makes no difference to the result.
+        return Dictionary(items.map { ($0.id, usable.standardized) },
+                          uniquingKeysWith: { first, _ in first })
     }
 }
 

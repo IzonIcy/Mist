@@ -49,7 +49,11 @@ public final class DisplayManager: DisplayManaging {
 
     public func reconcile(_ displays: [Display]) {
         lock.lock()
-        store = Dictionary(uniqueKeysWithValues: displays.map { ($0.id, $0) })
+        // `uniquingKeysWith` rather than `uniqueKeysWithValues`, which traps on a
+        // duplicate id. Display ids come from WindowServer and should be unique,
+        // but a crash is not an acceptable way to find out. Last one wins,
+        // matching WindowManager.
+        store = Dictionary(displays.map { ($0.id, $0) }, uniquingKeysWith: { _, newer in newer })
         let snapshot = Array(store.values)
         lock.unlock()
         for observer in observers {

@@ -121,7 +121,7 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
                             resolved: inout [String: AXUIElement]) -> Window? {
         guard let frame = copyFrame(element) else { return nil }
         // Untitled windows are legitimate (many apps expose nil titles); tile
-        // them on frame + identity rather than dropping them silently.
+        // them on frame alone rather than dropping them silently.
         let title = copyString(element, kAXTitleAttribute as CFString) ?? ""
 
         // CGWindowID is globally unique (assigned by WindowServer), so pid+CGWindowID
@@ -133,7 +133,16 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         } else if let identifier = copyString(element, kAXIdentifierAttribute as CFString), !identifier.isEmpty {
             id = "\(bundleID)-\(identifier)"
         } else {
-            id = makeFallbackID(appName: appName, frame: frame)
+            // Nothing stable to identify this window by. It used to fall back to
+            // one derived from the frame, which was wrong twice over: two windows
+            // from the same app at the same rounded origin collided, and the id
+            // changed the instant the tiler moved the window — reading as a close
+            // plus an open, costing focus, float state and a full retile.
+            //
+            // Skipping is the better failure. An unmanaged window is merely
+            // unmanaged; a misidentified one corrupts the whole reconcile loop.
+            logger.warning("Skipping a window in \(appName): no stable identifier")
+            return nil
         }
 
         AXUIElementSetMessagingTimeout(element, Self.axTimeout)
@@ -184,11 +193,7 @@ public final class AccessibilityWindowDiscovery: @unchecked Sendable, WindowElem
         return CGRect(origin: point, size: sizeCG)
     }
 
-    private func makeFallbackID(appName: String, frame: CGRect) -> String {
-        "\(appName)-\(Int(frame.minX))-\(Int(frame.minY))"
-    }
 }
-
 /// Interprets a `CFTypeRef` as an `AXUIElement` after verifying its type id.
 ///
 /// The AX API is dynamically typed. `AXUIElementCopyAttributeValue` hands back

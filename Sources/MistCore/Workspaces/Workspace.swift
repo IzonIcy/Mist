@@ -44,7 +44,11 @@ public final class WorkspaceManager {
     private var observers: [WorkspaceObserving] = []
 
     public init(initial: [Workspace] = []) {
-        self.store = Dictionary(uniqueKeysWithValues: initial.map { ($0.id, $0) })
+        // `uniquingKeysWith` rather than `uniqueKeysWithValues`, which traps on a
+        // duplicate id. Last one wins, matching WindowManager and
+        // DisplayManager.
+        self.store = Dictionary(initial.map { ($0.id, $0) },
+                                uniquingKeysWith: { _, newer in newer })
     }
 
     public var workspaces: [Workspace] {
