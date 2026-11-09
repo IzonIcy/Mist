@@ -240,6 +240,7 @@ public final class AppCoordinator {
             var windows = try discovery.scanWindows()
             applyRules(to: &windows)
             windowManager.reconcile(with: windows)
+            applyWorkspaceVisibility(to: windows)
             retile(windows: windows)
         } catch {
             // Missing/changed permission mid-scan: not fatal, log and wait.
@@ -385,6 +386,34 @@ public final class AppCoordinator {
         case .focusUp: focusDirectional(.up)
         case .focusDown: focusDirectional(.down)
         case .toggleFloat: toggleFloatFocused()
+        case .workspace1: switchWorkspace("1")
+        case .workspace2: switchWorkspace("2")
+        case .workspace3: switchWorkspace("3")
+        case .workspace4: switchWorkspace("4")
+        case .workspace5: switchWorkspace("5")
+        case .workspace6: switchWorkspace("6")
+        case .workspace7: switchWorkspace("7")
+        case .workspace8: switchWorkspace("8")
+        case .workspace9: switchWorkspace("9")
+        }
+    }
+
+    /// Switches to `id`, creating the workspace the first time it is used.
+    /// Visibility and tiling are re-derived from the new active workspace.
+    private func switchWorkspace(_ id: String) {
+        if workspaceManager.workspace(id: id) == nil {
+            workspaceManager.add(Workspace(id: id, name: id))
+        }
+        workspaceManager.switchTo(id)
+        refreshWindows()
+    }
+
+    /// Minimizes windows that belong to a workspace other than the active one
+    /// and restores the ones that belong to it. Windows no workspace claims
+    /// stay visible everywhere, so a config without workspace rules is unchanged.
+    private func applyWorkspaceVisibility(to windows: [Window]) {
+        for window in windows {
+            windowControl.setHidden(!workspaceManager.windowIsVisible(window.id), windowID: window.id)
         }
     }
 

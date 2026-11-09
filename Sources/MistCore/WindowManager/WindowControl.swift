@@ -17,6 +17,8 @@ public protocol WindowControling: AnyObject {
     func apply(_ plan: WindowPlan)
     /// Raises + activates the app owning the given window id.
     func focus(windowID: String)
+    /// Minimizes (`hidden: true`) or restores the given window.
+    func setHidden(_ hidden: Bool, windowID: String)
 }
 
 /// Concrete `WindowControling` backed by AX.
@@ -52,6 +54,18 @@ public final class AccessibilityWindowControl: @unchecked Sendable, WindowContro
         if let pid = owningPID(of: element),
            let app = NSRunningApplication(processIdentifier: pid) {
             app.activate(options: [.activateAllWindows])
+        }
+    }
+
+    public func setHidden(_ hidden: Bool, windowID: String) {
+        guard let element = resolver.element(for: windowID) else {
+            logger.debug("Skipping \(windowID): no live element")
+            return
+        }
+        let value = (hidden ? kCFBooleanTrue : kCFBooleanFalse) as CFTypeRef
+        let error = AXUIElementSetAttributeValue(element, kAXMinimizedAttribute as CFString, value)
+        if error != .success {
+            logger.debug("setHidden(\(hidden)) failed for \(windowID): AXError \(error.rawValue)")
         }
     }
 

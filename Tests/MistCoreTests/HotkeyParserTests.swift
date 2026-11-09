@@ -32,6 +32,14 @@ struct HotkeyParserTests {
         #expect(bindings.map(\.action) == ["focus_left", "toggle_float"])
     }
 
+    @Test func parsesWorkspaceActions() throws {
+        var table = TOMLTable()
+        table.set(.string("cmd+alt+3"), forKey: "workspace_3")
+
+        let bindings = try HotkeyConfigurationParser(table: table).parse()
+        #expect(bindings.first?.action == "workspace_3")
+    }
+
     @Test func unknownActionNameThrows() {
         var table = TOMLTable()
         table.set(.string("cmd+alt+h"), forKey: "focus_lefft")
