@@ -11,6 +11,15 @@ enum HotkeyAction: String, CaseIterable {
     case focusUp = "focus_up"
     case focusDown = "focus_down"
     case toggleFloat = "toggle_float"
+    case workspace1 = "workspace_1"
+    case workspace2 = "workspace_2"
+    case workspace3 = "workspace_3"
+    case workspace4 = "workspace_4"
+    case workspace5 = "workspace_5"
+    case workspace6 = "workspace_6"
+    case workspace7 = "workspace_7"
+    case workspace8 = "workspace_8"
+    case workspace9 = "workspace_9"
 }
 
 /// Turns a config `[hotkeys]` table into hotkey bindings.
