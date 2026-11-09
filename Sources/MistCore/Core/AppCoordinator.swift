@@ -367,17 +367,16 @@ public final class AppCoordinator {
     /// Dispatches a bound hotkey name to its behavior. The names are the
     /// binding keys from `[hotkeys]`, documented in the example config.
     private func performAction(_ action: String) {
-        switch action {
-        case "focus_left", "focus_right", "focus_up", "focus_down":
-            let direction: FocusDirection = action.hasSuffix("left") ? .left
-                : action.hasSuffix("right") ? .right
-                : action.hasSuffix("up") ? .up
-                : .down
-            focusDirectional(direction)
-        case "toggle_float":
-            toggleFloatFocused()
-        default:
-            logger.debug("No behavior bound to hotkey action '\(action)' yet")
+        guard let hotkeyAction = HotkeyAction(rawValue: action) else {
+            logger.debug("No behavior bound to hotkey action '\(action)'")
+            return
+        }
+        switch hotkeyAction {
+        case .focusLeft: focusDirectional(.left)
+        case .focusRight: focusDirectional(.right)
+        case .focusUp: focusDirectional(.up)
+        case .focusDown: focusDirectional(.down)
+        case .toggleFloat: toggleFloatFocused()
         }
     }
 

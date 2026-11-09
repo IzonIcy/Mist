@@ -22,4 +22,22 @@ struct HotkeyParserTests {
             _ = try HotkeyConfigurationParser.parseKeyString("cmd+frobnicate")
         }
     }
+
+    @Test func parsesKnownActionNames() throws {
+        var table = TOMLTable()
+        table.set(.string("cmd+alt+h"), forKey: "focus_left")
+        table.set(.string("cmd+alt+space"), forKey: "toggle_float")
+
+        let bindings = try HotkeyConfigurationParser(table: table).parse()
+        #expect(bindings.map(\.action) == ["focus_left", "toggle_float"])
+    }
+
+    @Test func unknownActionNameThrows() {
+        var table = TOMLTable()
+        table.set(.string("cmd+alt+h"), forKey: "focus_lefft")
+
+        #expect(throws: MistError.self) {
+            _ = try HotkeyConfigurationParser(table: table).parse()
+        }
+    }
 }

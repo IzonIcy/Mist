@@ -1,6 +1,18 @@
 import Foundation
 import Carbon.HIToolbox
 
+/// The commands a `[hotkeys]` binding name can trigger.
+///
+/// Parsing validates against this set so a typo in a binding name fails at
+/// config load instead of binding silently and never firing.
+enum HotkeyAction: String, CaseIterable {
+    case focusLeft = "focus_left"
+    case focusRight = "focus_right"
+    case focusUp = "focus_up"
+    case focusDown = "focus_down"
+    case toggleFloat = "toggle_float"
+}
+
 /// Turns a config `[hotkeys]` table into hotkey bindings.
 ///
 /// Config shape (flat map of binding name -> key string):
@@ -23,7 +35,13 @@ struct HotkeyConfigurationParser {
                 throw MistError.invalidConfiguration("hotkey '\(key)' must be a string")
             }
             let hotkey = try Self.parseKeyString(raw)
-            result.append(HotkeyConfiguration(name: key, key: hotkey, action: key))
+            guard let action = HotkeyAction(rawValue: key) else {
+                let known = HotkeyAction.allCases.map(\.rawValue).joined(separator: ", ")
+                throw MistError.invalidConfiguration(
+                    "unknown hotkey action '\(key)'. Known actions: \(known)"
+                )
+            }
+            result.append(HotkeyConfiguration(name: key, key: hotkey, action: action.rawValue))
         }
         return result
     }

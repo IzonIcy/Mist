@@ -16,10 +16,6 @@ well-typed alternative to yabai / aerospace.
 > window model and never applied to the real window. `animate` and `animation`
 > are parsed and have no effect.
 >
-> One rough edge worth knowing: hotkey actions are raw strings, so a name Mist
-> does not recognise — including a typo — binds successfully and then never
-> fires, with only a debug line to say so.
->
 > Runtime needs Accessibility + Input Monitoring grants; the pure middleware is
 > unit-verified.
 
