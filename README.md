@@ -10,11 +10,12 @@ well-typed alternative to yabai / aerospace.
 > (focus_left/right/up/down, toggle_float) are wired through a CGEventTap.
 > Config hot-reloads live.
 >
-> Parsed and accepted, but not acted on: the `monitor`, `workspace` and `layout`
-> rule actions run and write to the workspace and display stores, but nothing
-> reads those stores, so they have no effect. `always_on_top` is recorded on the
-> window model and never applied to the real window. `animate` and `animation`
-> are parsed and have no effect.
+> The `layout` rule now selects the tiling layout, and a window assigned to a
+> workspace is tiled only while that workspace is active. Nothing switches
+> workspaces yet, so a single-workspace config behaves as before. `monitor`
+> still records the display's workspace without moving the real window, and
+> `always_on_top` is recorded but not applied. `animate` and `animation` are
+> parsed and have no effect.
 >
 > Runtime needs Accessibility + Input Monitoring grants; the pure middleware is
 > unit-verified.

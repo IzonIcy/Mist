@@ -93,6 +93,22 @@ public final class WorkspaceManager {
         }
     }
 
+    /// Whether `windowID` should be tiled in the current workspace.
+    ///
+    /// A window no workspace claims stays visible, so a config without
+    /// workspace rules behaves exactly as it did before workspaces existed.
+    /// Once a window belongs to a workspace, only the active one shows it.
+    public func windowIsVisible(_ windowID: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let active = activeWorkspaceID else { return true }
+        if store[active]?.windowIDs.contains(windowID) == true {
+            return true
+        }
+        let claimed = store.values.contains { $0.windowIDs.contains(windowID) }
+        return !claimed
+    }
+
     public func workspace(id: String) -> Workspace? {
         lock.lock()
         defer { lock.unlock() }

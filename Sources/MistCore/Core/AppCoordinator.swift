@@ -17,6 +17,8 @@ public final class AppCoordinator {
     private let windowManager = WindowManager()
     private let displayManager = DisplayManager()
     private let workspaceManager = WorkspaceManager()
+    /// Layout selected by a `.layout` rule. Nil means use the config default.
+    private var activeLayout: LayoutName?
     private var hotkeyManager: HotkeyManager?
     private var accessibilityMonitor: AccessibilityMonitor?
     /// Live handle for the CGEventTap; nil until permission is granted.
@@ -293,6 +295,9 @@ public final class AppCoordinator {
                         ws.layout = layoutName
                         workspaceManager.add(ws) // update
                     }
+                    // A rule that matches the windows on screen should be visible
+                    // in the tiling, not just recorded in a store.
+                    activeLayout = layoutName
                 }
             }
         }
@@ -305,11 +310,14 @@ public final class AppCoordinator {
         }
         let tiler = WindowTiler(
             display: display,
-            layout: makeLayout(for: currentConfig.general.defaultLayout),
+            layout: makeLayout(for: activeLayout ?? currentConfig.general.defaultLayout),
             config: LayoutConfig(gap: CGFloat(currentConfig.general.gap),
                                  outerGap: CGFloat(currentConfig.general.outerGap))
         )
-        let plan = tiler.plan(for: windows)
+        // Windows assigned to another workspace keep their current frame and
+        // stop being re-tiled here.
+        let visible = windows.filter { workspaceManager.windowIsVisible($0.id) }
+        let plan = tiler.plan(for: visible)
         windowControl.apply(plan)
         logger.debug("Applied \(plan.count) frames on \(windows.count) windows")
     }
