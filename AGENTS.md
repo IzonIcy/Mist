@@ -24,6 +24,7 @@ Sources/MistCore/Accessibility/  permission trust, AX scan
 Sources/MistCore/Configuration/  TOML parser, loader, mapper
 Sources/MistCore/Hotkeys/        hotkey model, parser, conflict manager
 Sources/MistCore/LayoutEngine/   BSP, stack, horizontal, vertical, monocle, floating
+Sources/MistCore/Presets/        preset model, parser, window planner
 Sources/MistCore/Rules/          rule model, conditions, actions
 Sources/MistCore/Workspaces/     workspace model, layout sharing
 Sources/Mist/                    app target
@@ -33,7 +34,7 @@ Support/mist.toml                commented example config
 
 ## Known limitations
 
-The README status block is the source of truth for what is wired. As of November 2026, the `layout` rule selects the tiling layout and `workspace_1` through `workspace_9` switch workspaces by minimizing windows outside the target. `monitor` and `always_on_top` still do not change the real window. Do not describe those as working.
+The README status block is the source of truth for what is wired. As of November 2026, the `layout` rule selects the tiling layout, `workspace_1` through `workspace_9` switch workspaces by minimizing windows outside the target, and presets tile and raise a named set of apps. `monitor` still does not move the real window. `always_on_top`, `animate`, and `animation` are rejected at parse time, not applied. Do not describe any of those as working.
 
 ## Conventions
 
