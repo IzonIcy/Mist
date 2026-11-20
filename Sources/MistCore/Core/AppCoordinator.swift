@@ -108,7 +108,7 @@ public final class AppCoordinator {
         hasAppliedConfig = true
         let manager = HotkeyManager()
         do {
-            try manager.setBindings(config.hotkeys)
+            try manager.setBindings(config.hotkeyBindings)
             hotkeyManager = manager
         } catch {
             logger.error("Hotkey conflict detected: \(String(describing: error))")

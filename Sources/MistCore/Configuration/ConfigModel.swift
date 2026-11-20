@@ -13,13 +13,17 @@ public struct MistConfig: Sendable {
     public var hotkeys: [HotkeyConfiguration]
     /// Values from the `[[rules]]` array-of-tables section.
     public var rules: [Rule]
+    /// Values from the `[[preset]]` array-of-tables section.
+    public var presets: [Preset]
 
     public init(general: GeneralSettings = GeneralSettings(),
                 hotkeys: [HotkeyConfiguration] = [],
-                rules: [Rule] = []) {
+                rules: [Rule] = [],
+                presets: [Preset] = []) {
         self.general = general
         self.hotkeys = hotkeys
         self.rules = rules
+        self.presets = presets
     }
 }
 

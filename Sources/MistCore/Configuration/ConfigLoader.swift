@@ -56,10 +56,15 @@ private struct ConfigMapper {
 
     func map() throws -> MistConfig {
         let root = document.root
+        let general = try mapGeneral(root.value(forKey: "general"))
+        let hotkeys = try mapHotkeys(root.value(forKey: "hotkeys"))
+        let presets = try mapPresets(root.value(forKey: "preset"), defaultLayout: general.defaultLayout)
+        try validatePresetHotkeys(hotkeys: hotkeys, presets: presets)
         return MistConfig(
-            general: try mapGeneral(root.value(forKey: "general")),
-            hotkeys: try mapHotkeys(root.value(forKey: "hotkeys")),
-            rules: try mapRules(root.value(forKey: "rules"))
+            general: general,
+            hotkeys: hotkeys,
+            rules: try mapRules(root.value(forKey: "rules")),
+            presets: presets
         )
     }
 
@@ -115,6 +120,41 @@ private struct ConfigMapper {
             rules.append(try RuleParser(table: t).parse())
         }
         return rules
+    }
+
+    func mapPresets(_ raw: TOMLValue?, defaultLayout: LayoutName) throws -> [Preset] {
+        guard let raw else { return [] }
+        guard case let .array(items) = raw else {
+            throw MistError.invalidConfiguration("'preset' must be an array of tables")
+        }
+        var presets: [Preset] = []
+        for (index, item) in items.enumerated() {
+            guard case let .table(t) = item else {
+                throw MistError.invalidConfiguration("each preset must be a table")
+            }
+            presets.append(try PresetParser(table: t, index: index, defaultLayout: defaultLayout).parse())
+        }
+        return presets
+    }
+
+    /// Rejects a preset whose name or hotkey another binding already claims.
+    ///
+    /// A conflict here would otherwise surface at bind time as a dead hotkey
+    /// table, so it fails the config instead, naming both sides.
+    func validatePresetHotkeys(hotkeys: [HotkeyConfiguration], presets: [Preset]) throws {
+        var names = Set<String>()
+        var claimed: [(Hotkey, String)] = hotkeys.map { ($0.key, $0.name) }
+        for preset in presets {
+            guard names.insert(preset.name).inserted else {
+                throw MistError.invalidConfiguration("duplicate preset name '\(preset.name)'")
+            }
+            guard let key = preset.hotkey else { continue }
+            if let conflict = claimed.first(where: { $0.0 == key }) {
+                throw MistError.invalidConfiguration(
+                    "preset '\(preset.name)' hotkey '\(key)' is already bound to '\(conflict.1)'")
+            }
+            claimed.append((key, preset.action))
+        }
     }
 }
 
