@@ -12,16 +12,31 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Build (release)
-        run: swift build -c release
+      # The tag is the version. Stamping it here keeps Support/Info.plist from
+      # drifting behind the release the way it did at 0.1.0.
+      - name: Stamp version
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${GITHUB_REF_NAME#v}" Support/Info.plist
+      - name: Build app bundle
+        run: ./Scripts/build-app.sh --release
       - name: Package
         run: |
           dir="Mist-${GITHUB_REF_NAME#v}-aarch64-apple-darwin"
           mkdir "$dir"
-          cp .build/release/Mist "$dir/"
+          # Ship the .app, not the bare binary. Accessibility grants attach to a
+          # bundle identity, so a loose executable cannot be authorized.
+          cp -R build/Mist.app "$dir/"
           cp README.md LICENSE "$dir/"
-          zip -r "$dir.zip" "$dir"
+          zip -ry "$dir.zip" "$dir"
+      # A download nobody can verify is a download nobody should run.
+      - name: Checksum
+        run: |
+          out="SHA256SUMS-${GITHUB_REF_NAME}-aarch64-apple-darwin.txt"
+          shasum -a 256 *.zip > "$out"
+          cat "$out"
       - uses: softprops/action-gh-release@v3
         with:
-          files: "*.zip"
+          files: |
+            *.zip
+            SHA256SUMS-*.txt
           generate_release_notes: true
