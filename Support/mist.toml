@@ -17,11 +17,9 @@ outer_gap = 16
 # One of: bsp | horizontal | vertical | stack | monocle | floating
 layout = "bsp"
 
-# Master switch for animations.
-animate = true
-
-# Animation curve family: spring | ease | instant
-animation = "spring"
+# `animate` and `animation` are rejected at load time. Mist writes each frame
+# in one accessibility call, so there is no transition to animate. A config
+# that still sets them fails with the value quoted rather than ignoring it.
 
 # -----------------------------------------------------------------------------
 # [hotkeys]

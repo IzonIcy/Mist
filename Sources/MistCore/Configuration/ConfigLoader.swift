@@ -73,14 +73,33 @@ private struct ConfigMapper {
         guard case let .table(t) = raw else {
             throw MistError.invalidConfiguration("'general' must be a table")
         }
+        try rejectAnimationSettings(t)
         return GeneralSettings(
             gap: clampNonNegative(t.integer(forKey: "gap")),
             outerGap: clampNonNegative(t.integer(forKey: "outer_gap")),
             defaultLayout: try mapLayout(t.string(forKey: "layout")),
-            animate: t.bool(forKey: "animate") ?? true,
-            animationSpeed: mapSpeed(t.string(forKey: "animation")),
             focusFollowsMouse: t.bool(forKey: "focus_follows_mouse") ?? false
         )
+    }
+
+    /// `animate` and `animation` describe a transition Mist cannot perform.
+    ///
+    /// Frames are written in a single accessibility call, so there is no
+    /// timeline to attach a curve to. Rejecting the keys keeps them from
+    /// reading as settings that do something.
+    func rejectAnimationSettings(_ general: TOMLTable) throws {
+        if general.value(forKey: "animate") != nil {
+            let literal = general.bool(forKey: "animate").map { $0 ? "true" : "false" } ?? "not a boolean"
+            throw MistError.invalidConfiguration(
+                "'animate = \(literal)' is unsupported: Mist sets each frame in one accessibility call, "
+                + "so a layout change has no transition to animate")
+        }
+        if general.value(forKey: "animation") != nil {
+            let literal = general.string(forKey: "animation").map { "\"\($0)\"" } ?? "not a string"
+            throw MistError.invalidConfiguration(
+                "'animation = \(literal)' is unsupported: there is no cross-application animation API, "
+                + "so a motion curve has nothing to drive")
+        }
     }
 
     func mapLayout(_ raw: String?) throws -> LayoutName {
@@ -90,13 +109,6 @@ private struct ConfigMapper {
                 "unknown layout '\(raw)' (expected one of \(LayoutName.allCases.map(\.rawValue).joined(separator: ", ")))")
         }
         return name
-    }
-
-    func mapSpeed(_ raw: String?) -> AnimationSpeed {
-        if let raw, let style = AnimationSpeed(rawValue: raw) {
-            return style
-        }
-        return .spring
     }
 
     func mapHotkeys(_ raw: TOMLValue?) throws -> [HotkeyConfiguration] {

@@ -263,3 +263,31 @@ struct ConfigRejectionTests {
         }
     }
 }
+
+/// The animation settings are refused for the same reason always_on_top is:
+/// there is nothing behind them to drive.
+struct AnimationRejectionTests {
+
+    private let loader = ConfigLoader()
+
+    @Test func rejectsAnimateAndQuotesTheValue() {
+        let message = errorMessage("[general]\nanimate = true")
+        #expect(message?.contains("animate = true") == true)
+        #expect(message?.contains("unsupported") == true)
+    }
+
+    @Test func rejectsAnimationCurveAndQuotesTheValue() {
+        let message = errorMessage("[general]\nanimation = \"spring\"")
+        #expect(message?.contains("animation = \"spring\"") == true)
+        #expect(message?.contains("unsupported") == true)
+    }
+
+    private func errorMessage(_ source: String) -> String? {
+        do {
+            _ = try loader.parse(text: source)
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+}
