@@ -79,6 +79,10 @@ The line looks like `Preset 'call' tiled 2 window(s); no window for com.apple.ma
 
 ### Recording and checking it
 
+**Do not pass `-V`.** `screencapture -V <seconds>` is what produced the frozen tail described above: the file reports its full length while the last stretch repeats one frame. Start the recording with no duration limit and stop it with `kill -INT` instead.
+
+`ffmpeg` is not installed on the machine these were written on. [LumiComp's docs/demo.md](https://github.com/IzonIcy/LumiComp/blob/main/docs/demo.md) carries Swift replacements for both jobs, frame extraction and trimming, which work anywhere a Swift toolchain does.
+
 Full screen, not one window, because the point is several windows moving:
 
 ```sh
@@ -89,12 +93,12 @@ Do not trust the file's duration. Pull frames and check they differ, and that th
 
 ```sh
 for t in 5 15 25 40 50 56; do
-    ffmpeg -loglevel error -ss "$t" -i demo.mov -frames:v 1 "frame-$t.png" -y
+    swift /tmp/frame.swift demo.mov "frame-$t.png" "$t"
 done
 ```
 
 ```sh
-ffmpeg -i demo.mov -c:v libx264 -pix_fmt yuv420p -crf 28 -an demo.mp4
+swift /tmp/clip.swift demo.mov demo.mp4 0 56
 ```
 
 Upload it through the GitHub issue composer, paste the `user-attachments` URL on its own line under "Status", and delete the sentence that says there is no recording.
