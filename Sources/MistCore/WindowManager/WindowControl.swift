@@ -1,5 +1,4 @@
 import Foundation
-import AppKit
 import ApplicationServices
 import CoreGraphics
 
@@ -51,9 +50,13 @@ public final class AccessibilityWindowControl: @unchecked Sendable, WindowContro
             return
         }
         AXUIElementPerformAction(element, kAXRaiseAction as CFString)
-        if let pid = owningPID(of: element),
-           let app = NSRunningApplication(processIdentifier: pid) {
-            app.activate(options: [.activateAllWindows])
+        // Frontmost is the accessibility way to activate an app, so this layer
+        // stays on one API and MistCore keeps AppKit out of its dependency list.
+        guard let pid = owningPID(of: element) else { return }
+        let app = AXUIElementCreateApplication(pid)
+        let error = AXUIElementSetAttributeValue(app, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        if error != .success {
+            logger.debug("focus: could not make \(windowID) frontmost, AXError \(error.rawValue)")
         }
     }
 
