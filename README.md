@@ -2,85 +2,90 @@
 
 [![CI](https://github.com/IzonIcy/Mist/actions/workflows/ci.yml/badge.svg)](https://github.com/IzonIcy/Mist/actions/workflows/ci.yml)
 
-A tiling window manager for macOS, built from the ground up as a modern, open,
-well-typed alternative to yabai / aerospace.
+Mist is a tiling window manager for macOS, written in Swift with no third-party dependencies, for people who would rather read and edit a typed TOML config than debug a shell scripting layer.
 
-> **Status: functional.** Scan → reconcile → tile → apply works against real
-> windows. The `float` rule action applies, and hotkeys
-> (focus_left/right/up/down, toggle_float) are wired through a CGEventTap.
-> Config hot-reloads live.
->
-> The `layout` rule selects the tiling layout. `workspace_1` through
-> `workspace_9` switch workspaces: windows in the target are restored and tiled,
-> windows in other workspaces are minimized, and windows no workspace claims stay
-> visible everywhere. `monitor`
-> still records the display's workspace without moving the real window, and
-> `always_on_top` is recorded but not applied. `animate` and `animation` are
-> parsed and have no effect.
->
-> Runtime needs Accessibility + Input Monitoring grants; the pure middleware is
-> unit-verified.
-
-## Why
-
-The existing options are either closed-source, abandoned, or sprawling C.
-Mist is:
-
-- **Open source** — still free, still MIT-licensed.
-- **Type-safe** — Swift enums/structs instead of stringly-typed config handling.
-- **Boring on purpose** — the config is a file, mirrors are explicit, and
-  complexity is actively fought.
-
-## Architecture
-
-Two targets:
-
-- **`MistCore`** — all logic, no AppKit. Parses config, computes layout, runs
-  the engine, owns the events. Unit-testable headlessly.
-- **`Mist`** — the macOS menu-bar app. Owns the accessibility connection and
-  renders windows into the grid the engine computes.
-
-Directory layout under `Sources/MistCore/`:
-
-```
-Accessibility/  Permission trust + monitor, window discovery (AX scan).
-Animations/     Motion curves + reduce-motion support.
-Core/           AppCoordinator, EventBus, Logger, MistError.
-Configuration/  TOML parser, config loader/mapper, LayoutName.
-Displays/       Display model + CG display-frame provider.
-Hotkeys/        Hotkey model + parser + conflict-checking manager.
-LayoutEngine/   BSP/stack/horizontal/vertical/monocle/floating.
-Rules/          Rule, conditions, actions.
-WindowManager/  Window model + manager, AX control (move/resize/focus), tiler, geometry.
-Workspaces/     Workspace model + layout sharing.
-```
-
-## Building
-
-Requirements: macOS 14+, Swift 5.9+, Command Line Tools.
+There is no screenshot yet. [docs/demo.md](docs/demo.md) explains what blocks one and the steps that will produce `docs/images/demo.png`.
 
 ```sh
-swift build            # debug
-./Scripts/build-app.sh # assembles build/Mist.app (ad-hoc signed)
+./Scripts/build-app.sh && cp -R build/Mist.app /Applications/
 ```
 
-### Tests
+## Status
 
-`swift test` is the target. Note: running the suite locally currently needs a
-full Xcode install (the CLI-only `swift test` lacks the testing backend in some
-CLT builds). The logic is verified headlessly via the release of a self-check
-harness; restore the suite once a normal toolchain is available.
+This section is the source of truth for what is wired.
+
+Scan, reconcile, tile, and apply work against real windows. The `float` rule action applies, and the `focus_left`, `focus_right`, `focus_up`, `focus_down`, and `toggle_float` hotkeys are wired through a CGEventTap. Config hot-reloads live.
+
+The `layout` rule selects the tiling layout. `workspace_1` through `workspace_9` switch workspaces: windows in the target workspace are restored and tiled, windows in other workspaces are minimized, and windows that no workspace claims stay visible everywhere.
+
+Runtime needs Accessibility and Input Monitoring grants. The logic in `MistCore` is unit-verified without either.
+
+## What it does not do yet
+
+- `monitor` records the display's workspace without moving the real window.
+- `always_on_top` is recorded but not applied.
+- `animate` and `animation` are parsed and have no effect.
+- `swift test` needs a full Xcode install, so a machine with only Command Line Tools cannot run the suite.
+
+## Compared with yabai and AeroSpace
+
+yabai and AeroSpace are the obvious alternatives, and both are more mature. They have shipped for years and they cover more window and configuration behavior than Mist does. If you need that coverage today, use one of them. What Mist offers instead is a smaller thing: one TOML file at a fixed path, layouts as pure functions that run in tests without a window server, and a codebase small enough to read in full when something goes wrong.
 
 ## Configuration
 
-Config lives at `~/Library/Application Support/Mist/mist.toml` (TOML,
-hot-reloaded). See [`Support/mist.toml`](Support/mist.toml) for a commented
-example covering layout, gaps, hotkeys, and per-app rules.
+Config lives at `~/Library/Application Support/Mist/mist.toml` and hot-reloads when you edit it. [`Support/mist.toml`](Support/mist.toml) is a commented example covering layout, gaps, hotkeys, and per-app rules.
+
+Validation happens at parse time. A bad value fails with `MistError.invalidConfiguration` and the offending value quoted, so a binding that cannot work never binds silently.
+
+### Layouts
+
+Six layouts: `bsp`, `stack`, `horizontal`, `vertical`, `monocle`, and `floating`. Set the default with `layout` in the `[general]` table or per workspace with a `layout` rule.
+
+### Rules
+
+Rules match on app name, window title substring, or bundle ID, and the conditions within one rule are AND-ed. Actions are `float`, `always_on_top`, `monitor`, `workspace`, and `layout`. The status section above says which of those change real windows.
+
+## Architecture
+
+Two targets in one Swift package:
+
+- `MistCore` holds all logic and imports no AppKit. Config parsing, layout, the engine, and the event bus live here, which makes them testable headlessly.
+- `Mist` is the menu-bar app. It owns the accessibility connection and applies the computed layout to real windows.
+
+Keep new logic in `MistCore`. If it needs AppKit to run, it belongs in the app target.
+
+```
+Sources/MistCore/Accessibility/  Permission trust, window discovery (AX scan)
+Sources/MistCore/Animations/     Motion curves, reduce-motion support
+Sources/MistCore/Configuration/  TOML parser, config loader and mapper
+Sources/MistCore/Core/           AppCoordinator, EventBus, Logger, MistError
+Sources/MistCore/Displays/       Display model, CG display-frame provider
+Sources/MistCore/Hotkeys/        Hotkey model, parser, conflict manager
+Sources/MistCore/LayoutEngine/   BSP, stack, horizontal, vertical, monocle, floating
+Sources/MistCore/Rules/          Rule model, conditions, actions
+Sources/MistCore/WindowManager/  Window model, AX move/resize/focus, tiler, geometry
+Sources/MistCore/Workspaces/     Workspace model, layout sharing
+Sources/Mist/                    App target
+Tests/MistCoreTests/
+Support/mist.toml                Commented example config
+```
+
+A layout is a pure function: same items, rect, and config in, same frames out. That purity is what makes the engine testable and a new layout a self-contained conformance to `Layout`.
+
+## Building
+
+Requirements: macOS 14 or later, and a Swift 6 toolchain (the package declares tools version 6.0). `swift build` works with Command Line Tools alone.
+
+```sh
+swift build            # debug build
+./Scripts/build-app.sh # assembles build/Mist.app, ad-hoc signed
+```
+
+`swift test` needs a full Xcode install. The CLI-only toolchain lacks the testing backend in some builds.
 
 ## Distribution
 
-Mist ships as a real `.app` bundle (the repo is SwiftPM, no `.xcodeproj`) that
-the build script assembles from the compiled binary. Grab it with:
+Mist ships as a real `.app` bundle. The repo is SwiftPM with no `.xcodeproj`, so the build script assembles the bundle from the compiled binary.
 
 ```sh
 git clone <repo-url> && cd Mist
@@ -88,7 +93,8 @@ git clone <repo-url> && cd Mist
 cp -R build/Mist.app /Applications/
 ```
 
-No Homebrew, no casks — just clone, build, and drag it into `/Applications`.
+No Homebrew and no casks. Clone, build, and copy it into `/Applications`.
 
-Signing: ad-hoc by default. For public distribution set `MIST_SIGNING_IDENTITY`
-to a Developer ID and notarize (`codesign --deep --options runtime`).
+The bundle is ad-hoc signed by default. For public distribution, set `MIST_SIGNING_IDENTITY` to a Developer ID and notarize with `codesign --deep --options runtime`.
+
+MIT licensed.
