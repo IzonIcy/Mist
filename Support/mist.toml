@@ -54,3 +54,29 @@ float = true
 [[rules]]
 window_bundle_id = "com.mitchellh.ghostty"
 monitor = 2
+# -----------------------------------------------------------------------------
+# [[preset]]
+# -----------------------------------------------------------------------------
+# A preset is a named set of apps you can put back on screen with one key. It
+# focuses and tiles the windows of every running app whose bundle id it lists,
+# in the order the ids appear, and writes the bundle ids that had no window to
+# the log so you can see what was missing.
+#
+# name        required, unique, also the name in logs
+# bundle_ids  required, the apps to collect
+# layout      optional, one of the six layouts above; defaults to [general].layout
+# hotkey      optional; a preset hotkey cannot duplicate any other binding
+
+# Writing: editor and terminal side by side, docs on the right.
+[[preset]]
+name = "coding"
+bundle_ids = ["com.mitchellh.ghostty", "com.apple.dt.Xcode", "com.apple.Safari"]
+layout = "bsp"
+hotkey = "cmd+alt+1"
+
+# On a call: the call window on top, chat and notes below it.
+[[preset]]
+name = "call"
+bundle_ids = ["us.zoom.xos", "com.tinyspeck.slackmacgap", "com.apple.Notes"]
+layout = "vertical"
+hotkey = "cmd+alt+2"

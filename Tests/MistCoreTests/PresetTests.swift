@@ -149,6 +149,16 @@ struct PresetParsingTests {
         #expect(message?.contains("duplicate preset name 'coding'") == true)
     }
 
+    @Test func shippedExampleConfigLoads() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let config = try loader.load(from: root.appendingPathComponent("Support/mist.toml"))
+        #expect(config.presets.map(\.name) == ["coding", "call"])
+        #expect(config.hotkeyBindings.count == config.hotkeys.count + 2)
+    }
+
     private func errorMessage(_ source: String) -> String? {
         do {
             _ = try loader.parse(text: source)
