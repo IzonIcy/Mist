@@ -10,7 +10,6 @@ import Foundation
 /// app = "Safari"                 # any of app / title_contains / bundle_id
 /// title_contains = "Picture-in-Picture"
 /// float = true                   # action fields
-/// always_on_top = true
 /// monitor = 2
 /// workspace = "main"
 /// layout = "bsp"
@@ -35,8 +34,14 @@ struct RuleParser {
         if let b = table.bool(forKey: "float") {
             actions.append(.float(b))
         }
-        if let b = table.bool(forKey: "always_on_top") {
-            actions.append(.alwaysOnTop(b))
+        // No public accessibility attribute exposes a window's level, so this
+        // action could only ever be recorded. Recorded-and-ignored is the
+        // failure mode the config is supposed to reject, so it does.
+        if table.value(forKey: "always_on_top") != nil {
+            let literal = table.bool(forKey: "always_on_top").map { $0 ? "true" : "false" } ?? "not a boolean"
+            throw MistError.invalidConfiguration(
+                "rule '\(name ?? "<unnamed>")' has 'always_on_top = \(literal)', which Mist cannot apply: "
+                + "the accessibility API exposes no window level, so no public call raises another app's window")
         }
         if let m = table.integer(forKey: "monitor") {
             actions.append(.monitor(Int(m)))

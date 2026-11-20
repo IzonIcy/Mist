@@ -227,3 +227,39 @@ struct PresetApplyTests {
                isFloating: floating)
     }
 }
+
+/// Config keys Mist refuses to honour, so they fail the load instead of being
+/// recorded and ignored.
+struct ConfigRejectionTests {
+
+    private let loader = ConfigLoader()
+
+    @Test func rejectsAlwaysOnTopAndQuotesTheValue() {
+        let message = errorMessage("""
+        [[rules]]
+        name = "PiP"
+        window_app = "Safari"
+        always_on_top = true
+        """)
+        #expect(message?.contains("always_on_top = true") == true)
+        #expect(message?.contains("rule 'PiP'") == true)
+    }
+
+    @Test func rejectsAlwaysOnTopEvenWhenFalse() {
+        let message = errorMessage("""
+        [[rules]]
+        window_app = "Safari"
+        always_on_top = false
+        """)
+        #expect(message?.contains("always_on_top = false") == true)
+    }
+
+    private func errorMessage(_ source: String) -> String? {
+        do {
+            _ = try loader.parse(text: source)
+            return nil
+        } catch {
+            return String(describing: error)
+        }
+    }
+}
