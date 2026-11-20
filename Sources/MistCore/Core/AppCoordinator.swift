@@ -312,8 +312,7 @@ public final class AppCoordinator {
         let tiler = WindowTiler(
             display: display,
             layout: makeLayout(for: activeLayout ?? currentConfig.general.defaultLayout),
-            config: LayoutConfig(gap: CGFloat(currentConfig.general.gap),
-                                 outerGap: CGFloat(currentConfig.general.outerGap))
+            config: layoutConfig
         )
         // Windows assigned to another workspace keep their current frame and
         // stop being re-tiled here.
@@ -321,6 +320,11 @@ public final class AppCoordinator {
         let plan = tiler.plan(for: visible)
         windowControl.apply(plan)
         logger.debug("Applied \(plan.count) frames on \(windows.count) windows")
+    }
+
+    private var layoutConfig: LayoutConfig {
+        LayoutConfig(gap: CGFloat(currentConfig.general.gap),
+                     outerGap: CGFloat(currentConfig.general.outerGap))
     }
 
     // MARK: hotkeys
@@ -374,8 +378,13 @@ public final class AppCoordinator {
     }
 
     /// Dispatches a bound hotkey name to its behavior. The names are the
-    /// binding keys from `[hotkeys]`, documented in the example config.
+    /// binding keys from `[hotkeys]`, documented in the example config, plus
+    /// one `preset:<name>` action per preset that declares a hotkey.
     private func performAction(_ action: String) {
+        if let presetName = Preset.name(fromAction: action) {
+            applyPreset(named: presetName)
+            return
+        }
         guard let hotkeyAction = HotkeyAction(rawValue: action) else {
             logger.debug("No behavior bound to hotkey action '\(action)'")
             return
@@ -395,6 +404,46 @@ public final class AppCoordinator {
         case .workspace7: switchWorkspace("7")
         case .workspace8: switchWorkspace("8")
         case .workspace9: switchWorkspace("9")
+        }
+    }
+
+    /// Tiles the windows a preset names and raises them, in the order the
+    /// preset lists the apps. The report at info level names the bundle ids
+    /// that had no window, which is the only place that outcome surfaces.
+    private func applyPreset(named name: String) {
+        guard let preset = currentConfig.presets.first(where: { $0.name == name }) else {
+            logger.warning("Preset '\(name)' is not in the loaded config")
+            return
+        }
+        guard permissionGranted else {
+            logger.warning("Preset '\(name)' skipped: accessibility permission missing")
+            return
+        }
+        guard let display = displayFrames.displayFrame else {
+            logger.warning("Preset '\(name)' skipped: no display to tile onto")
+            return
+        }
+        do {
+            var windows = try discovery.scanWindows()
+            applyRules(to: &windows)
+            windowManager.reconcile(with: windows)
+            let plan = PresetTiler(preset: preset, display: display, config: layoutConfig).plan(for: windows)
+            // A window the workspace switch minimized is still in the plan, so
+            // restore it before moving it or the frame lands on nothing.
+            for windowID in plan.windowIDs {
+                windowControl.setHidden(false, windowID: windowID)
+            }
+            windowControl.apply(plan.frames)
+            for windowID in plan.windowIDs.reversed() {
+                windowControl.focus(windowID: windowID)
+            }
+            var report = "Preset '\(name)' tiled \(plan.frames.count) window(s)"
+            if !plan.missingBundleIDs.isEmpty {
+                report += "; no window for \(plan.missingBundleIDs.joined(separator: ", "))"
+            }
+            logger.info(report)
+        } catch {
+            logger.error("Preset '\(name)' scan failed", error: error)
         }
     }
 

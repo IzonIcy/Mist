@@ -158,3 +158,72 @@ struct PresetParsingTests {
         }
     }
 }
+
+/// The pure preset planner: a window snapshot in, frames and a missing-app
+/// report out.
+struct PresetApplyTests {
+
+    private let display = CGRect(x: 0, y: 0, width: 1600, height: 1000)
+    private let spacing = LayoutConfig(gap: 0, outerGap: 0)
+
+    @Test func tilesOnlyTheNamedAppsAndReportsTheMissingOne() {
+        let preset = Preset(name: "coding",
+                            bundleIDs: ["com.apple.dt.Xcode", "us.zoom.xos", "com.mitchellh.ghostty"],
+                            layout: .horizontal)
+        let plan = PresetTiler(preset: preset, display: display, config: spacing).plan(for: [
+            window("x1", bundle: "com.apple.dt.Xcode"),
+            window("z1", bundle: "us.zoom.xos"),
+            window("s1", bundle: "com.apple.Safari"),
+        ])
+        #expect(plan.windowIDs == ["x1", "z1"])
+        #expect(plan.missingBundleIDs == ["com.mitchellh.ghostty"])
+        #expect(plan.frames["s1"] == nil)
+        #expect(plan.frames.count == 2)
+        #expect(plan.frames["x1"]?.minX == 0)
+        #expect(plan.frames["z1"]?.minX == 800)
+        #expect(plan.frames["x1"]?.width == 800)
+    }
+
+    @Test func tilesInBundleListOrderNotScanOrder() {
+        let preset = Preset(name: "calls",
+                            bundleIDs: ["us.zoom.xos", "com.apple.dt.Xcode"],
+                            layout: .horizontal)
+        let plan = PresetTiler(preset: preset, display: display, config: spacing).plan(for: [
+            window("x1", bundle: "com.apple.dt.Xcode"),
+            window("z1", bundle: "us.zoom.xos"),
+        ])
+        #expect(plan.windowIDs == ["z1", "x1"])
+        #expect(plan.frames["z1"]?.minX == 0)
+    }
+
+    @Test func skipsFloatingWindowsWithoutCallingThemMissing() {
+        let preset = Preset(name: "coding", bundleIDs: ["com.apple.dt.Xcode"], layout: .horizontal)
+        let plan = PresetTiler(preset: preset, display: display, config: spacing).plan(for: [
+            window("x1", bundle: "com.apple.dt.Xcode"),
+            window("x2", bundle: "com.apple.dt.Xcode", floating: true),
+        ])
+        #expect(plan.windowIDs == ["x1"])
+        #expect(plan.frames["x2"] == nil)
+        #expect(plan.missingBundleIDs.isEmpty)
+    }
+
+    @Test func reportsEveryBundleWhenNothingIsRunning() {
+        let preset = Preset(name: "coding",
+                            bundleIDs: ["com.apple.dt.Xcode", "com.mitchellh.ghostty"],
+                            layout: .bsp)
+        let plan = PresetTiler(preset: preset, display: display, config: spacing).plan(for: [])
+        #expect(plan.frames.isEmpty)
+        #expect(plan.windowIDs.isEmpty)
+        #expect(plan.missingBundleIDs == ["com.apple.dt.Xcode", "com.mitchellh.ghostty"])
+    }
+
+    private func window(_ id: String, bundle: String, floating: Bool = false) -> Window {
+        Window(id: id,
+               displayIdentifier: "display-1",
+               appName: bundle,
+               title: id,
+               bundleID: bundle,
+               frame: CGRect(x: 40, y: 40, width: 400, height: 300),
+               isFloating: floating)
+    }
+}
