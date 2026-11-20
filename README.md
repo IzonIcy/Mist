@@ -4,7 +4,7 @@
 
 Mist is a tiling window manager for macOS, written in Swift with no third-party dependencies, for people who would rather read and edit a typed TOML config than debug a shell scripting layer.
 
-There is no screenshot yet. [docs/demo.md](docs/demo.md) explains what blocks one and the steps that will produce `docs/images/demo.png`.
+There is no screenshot and no recording yet. [docs/demo.md](docs/demo.md) explains what blocks both and the steps that will produce them.
 
 ```sh
 ./Scripts/build-app.sh && cp -R build/Mist.app /Applications/
